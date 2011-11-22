@@ -44,6 +44,7 @@ v.0.6.6 - 1 - fixed bugs that caused incorrect calling of female f2 X chromosome
 v.0.6.7 - bug fix - was replacing indiv names that contained "NA" with prior (e.g.indivA2_TNATTG)
 v.0.6.8 - bug fix - was testing sex as logical 0/1, rather than numeric.
 v.0.6.9 - changed scoring of males in f2 crosses to folow scoring in bc. Examine only whether par1 > or < par2
+v.0.6.10 - bug fix - open files in Universal new line mode ('rU', which prevents error and failure to read phenofile). Unfortunately, code is buried in try statements, which hides this error from view. Should revise code to discard try statements.
 """
 
 import sys
@@ -168,7 +169,7 @@ def main(argv=None):
                                 sex = get_sex_sexfile(sexfile + ".sorted")
                         except:
                                 sex = []
-                                get_num_inds = open(filePar2,'r')
+                                get_num_inds = open(filePar2,'rU')
                                 for line in get_num_inds:
                                         sex.append('0')
 
@@ -355,7 +356,7 @@ def natsorted(seq, cmp=natcmp):
 
 
 def sort_file(infile,delim):
-        original_file = csv.reader(open(infile,'r'),delimiter=delim)
+        original_file = csv.reader(open(infile,'rU'),delimiter=delim)
         header = original_file.next()
         data_dict = dict([(line[0],line[1:]) for line in original_file])
         #sort by individual name
@@ -379,8 +380,8 @@ def f2_reduce_prob_slots(par2,par1,sex):
         THEN, PUT PROBPAR12 (1-NEWPROBPAR1) IN PROBPAR2 (heterozygous)
         MALES STAY AS THEY ARE 
         '''
-        thinned_file_par2 = csv.reader(open(par2 + ".pulled.converted.thinned", 'r'),delimiter = '\t')
-        thinned_file_par1 = csv.reader(open(par1 + ".pulled.converted.thinned", 'r'),delimiter = '\t')
+        thinned_file_par2 = csv.reader(open(par2 + ".pulled.converted.thinned", 'rU'),delimiter = '\t')
+        thinned_file_par1 = csv.reader(open(par1 + ".pulled.converted.thinned", 'rU'),delimiter = '\t')
 
         converted_file_par2 = csv.writer(open(par2 + ".pulled.converted.thinned.f2_rqtl", "w"), delimiter = '\t')
         converted_file_par1 = csv.writer(open(par1 + ".pulled.converted.thinned.f2_rqtl", "w"), delimiter = '\t')
@@ -452,7 +453,7 @@ def f2_reduce_prob_slots(par2,par1,sex):
 
 def tsv2csv_bc(par2,sex):
         par2_thinned = par2 + ".pulled.converted.thinned"
-        thinned_file = csv.reader(open(par2_thinned, 'r'),delimiter = '\t')
+        thinned_file = csv.reader(open(par2_thinned, 'rU'),delimiter = '\t')
         csv_out = csv.writer(open(par2 + ".csv", "w"), delimiter = ',')
         header = thinned_file.next()
         chroms = [i.split(":")[0] for i in header]
@@ -502,8 +503,8 @@ def tsv2csv_bc(par2,sex):
 def tsv2csv_f2(par2,par1,sex):
         par2_thinned = par2 + ".pulled.converted.thinned"#changed to sample from thinned, rather than f2_qtl data, to get female pgm calls correct
         par1_thinned = par1 + ".pulled.converted.thinned"
-        thinned_file_par2 = csv.reader(open(par2_thinned, 'r'),delimiter = '\t')
-        thinned_file_par1 = csv.reader(open(par1_thinned, 'r'),delimiter = '\t')
+        thinned_file_par2 = csv.reader(open(par2_thinned, 'rU'),delimiter = '\t')
+        thinned_file_par1 = csv.reader(open(par1_thinned, 'rU'),delimiter = '\t')
         csv_out = csv.writer(open(par2 + ".csv", "w"), delimiter = ',')
         header = thinned_file_par2.next()
         skip = thinned_file_par1.next()
@@ -587,7 +588,7 @@ def sex_all2sex(num_inds,sex_all):
 def get_sex_phenofile(phenofile):
         sex = []
         #get sex from phenofile
-        open_file = csv.reader(open(phenofile,'r'),delimiter='\t')
+        open_file = csv.reader(open(phenofile,'rU'),delimiter='\t')
         header = open_file.next()
         sex_index = header.index('sex')
         for row in open_file:
@@ -603,7 +604,7 @@ def get_sex_phenofile(phenofile):
 def get_sex_sexfile(sexfile):
         sex = []
         #get sex from sexfile
-        open_file = csv.reader(open(sexfile,'r'),delimiter='\t')
+        open_file = csv.reader(open(sexfile,'rU'),delimiter='\t')
         header = open_file.next()
         sex_index = header.index('sex')
         for row in open_file:
@@ -643,13 +644,13 @@ def replace_all_in_array(array,obj,replacement):
 
 def pull_idds(sample_file,indivs):#filePar2,indivs):
         print "pulling requested individuals"
-        open_file = open(sample_file,'r')
+        open_file = open(sample_file,'rU')
         out_file = open(sample_file + ".pulled",'w')
         positions = open_file.readline()
         out_file.write(positions)
         for indiv in indivs:
                 print indiv
-                open_file = open(sample_file,'r')
+                open_file = open(sample_file,'rU')
                 for line in open_file:
                         if indiv in line:
                                 ##CHECK FOR NOT ALL NA IN ROW
@@ -658,7 +659,7 @@ def pull_idds(sample_file,indivs):#filePar2,indivs):
         out_file.close()
 
 def file_to_pulled(sample_file):
-        open_file = csv.reader(open(sample_file,'r'),delimiter='\t')
+        open_file = csv.reader(open(sample_file,'rU'),delimiter='\t')
         print_file = csv.writer(open(sample_file + ".pulled",'w'),delimiter='\t')
         for line in open_file:
                 print_file.writerow(line)
@@ -671,7 +672,7 @@ def NA2prior(sample_file,chroms,sex):
         col_del=[]
         num_loci = 0
         num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled",'r'),delimiter='\t')
+        open_file = csv.reader(open(sample_file + ".pulled",'rU'),delimiter='\t')
         ##get data into lists
         for row in open_file:
                 temp_data.append(row)
@@ -757,7 +758,7 @@ def thin(sample_file):
         col_del=[]
         num_loci = 0
         num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled.converted",'r'),delimiter='\t')
+        open_file = csv.reader(open(sample_file + ".pulled.converted",'rU'),delimiter='\t')
         thinned_file = csv.writer(open(sample_file +".pulled.converted.thinned",'w'),delimiter='\t')
 
         ##get data into lists
@@ -854,7 +855,7 @@ def thin_NA(sample_file):
         col_del=[]
         num_loci = 0
         num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled.converted",'r'),delimiter='\t')
+        open_file = csv.reader(open(sample_file + ".pulled.converted",'rU'),delimiter='\t')
         thinned_file = csv.writer(open(sample_file +".pulled.converted.thinned",'w'),delimiter='\t')
 
         ##get data into lists
@@ -949,7 +950,7 @@ def thin_Par1(sample_file,col_del):
         temp_data=[]
         num_loci = 0
         num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled.converted",'r'),delimiter='\t')
+        open_file = csv.reader(open(sample_file + ".pulled.converted",'rU'),delimiter='\t')
         thinned_file = csv.writer(open(sample_file +".pulled.converted.thinned",'w'),delimiter='\t')
 
         print "thinning data Par1"
@@ -1001,7 +1002,7 @@ def combine_filePar2(filePar2):
 #Find all chromosome names, put in list
         chrom_positions=[]
         for file_name in filePar2:
-                open_file = csv.reader(open(file_name + ".pulled.thinned",'r'),delimiter='\t')
+                open_file = csv.reader(open(file_name + ".pulled.thinned",'rU'),delimiter='\t')
                 row = open_file.next()
                 chrom_positions.append(row)
         chrom_positions = [item for sublist in chrom_positions for item in sublist]#make single list sublists
@@ -1036,7 +1037,7 @@ def combine_filePar2(filePar2):
 
         for file_name in filePar2:
                 ind_data=[]
-                open_file = csv.reader(open(file_name + ".pulled.thinned",'r'),delimiter='\t')
+                open_file = csv.reader(open(file_name + ".pulled.thinned",'rU'),delimiter='\t')
                 file_header = open_file.next()
                 for row in open_file:
                         ind_data.append(row)
@@ -1070,7 +1071,7 @@ def combine_filePar2(filePar2):
                 print_file.writerow(line)
 
 def count_lines(count_file):
-        filename = open(count_file,'r')
+        filename = open(count_file,'rU')
         x = 0
         for line in filename:
                 x+=1
