@@ -525,7 +525,7 @@ def tsv2csv_f2(par2,par1,sex):
                 ind_sex = sex[x]
                 converted_markers = []
                 converted_markers.append(ind)
-                if ind_sex == '0':#if female, autosome genotypes = AA, AB, BB, X genotypes = AA (homozygote), AB
+                if ind_sex == 0:#if female, autosome genotypes = AA, AB, BB, X genotypes = AA (homozygote), AB
 
                         for z in xrange(len(markers_p2)):
                                 genos = [float(markers_p1[z]), 1- float(markers_p2[z]) - float(markers_p1[z]), float(markers_p2[z])]#genotype probs for AA, AB, BB
