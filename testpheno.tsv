@@ -1,6 +1,7 @@
 	example1	example2	sex
-indivA10_GAAGTG	5	1	1
+indivA10_GAAGTG	5	1	0
 indivA12_AATAAG	10	1	0
 indivA1_AAATAG	3	0	0
-indivA2_TAATTG	1	  2	0
+indivA2_TAATTG	1	  2	1
 indivA11_AAAGCG	4	0	1
+indivA20_TAATTG	4	0	1
