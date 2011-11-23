@@ -395,7 +395,7 @@ def f2_reduce_prob_slots(par2,par1,sex):
         ind = 0
         for row in thinned_file_par2:
                 par1_line = thinned_file_par1.next()
-                if sex[ind] == 1:#if male, calc prob_par1 = 1 - prob_par2
+                if sex[ind] == '1':#if male, calc prob_par1 = 1 - prob_par2
                         #converted_file_par2.writerow(row)
                         #converted_file_par1.writerow(par1_line)
 
@@ -525,7 +525,7 @@ def tsv2csv_f2(par2,par1,sex):
                 ind_sex = sex[x]
                 converted_markers = []
                 converted_markers.append(ind)
-                if ind_sex == 0:#if female, autosome genotypes = AA, AB, BB, X genotypes = AA (homozygote), AB
+                if ind_sex == '0':#if female, autosome genotypes = AA, AB, BB, X genotypes = AA (homozygote), AB
 
                         for z in xrange(len(markers_p2)):
                                 genos = [float(markers_p1[z]), 1- float(markers_p2[z]) - float(markers_p1[z]), float(markers_p2[z])]#genotype probs for AA, AB, BB
@@ -593,13 +593,13 @@ def get_sex_phenofile(phenofile):
         header = open_file.next()
         sex_index = header.index('sex')
         for row in open_file:
-                sex.append(int(row[sex_index]))
-        replace_all(sex,'0',int('0'))
-        replace_all(sex,'1',int('1'))
-        replace_all(sex,'F',int('0'))
-        replace_all(sex,'f',int('0'))
-        replace_all(sex,'M',int('1'))
-        replace_all(sex,'m',int('1'))
+                sex.append(str(row[sex_index]))
+        replace_all(sex,0,'0')
+        replace_all(sex,1,'1')
+        replace_all(sex,'F','0')
+        replace_all(sex,'f','0')
+        replace_all(sex,'M','1')
+        replace_all(sex,'m','1')
         return sex
 
 def get_sex_sexfile(sexfile):
@@ -609,13 +609,13 @@ def get_sex_sexfile(sexfile):
         header = open_file.next()
         sex_index = header.index('sex')
         for row in open_file:
-                sex.append(int(row[sex_index]))
-        replace_all(sex,'0',int('0'))
-        replace_all(sex,'1',int('1'))
-        replace_all(sex,'F',int('0'))
-        replace_all(sex,'f',int('0'))
-        replace_all(sex,'M',int('1'))
-        replace_all(sex,'m',int('1'))
+                sex.append(str(row[sex_index]))
+        replace_all(sex,0,'0')
+        replace_all(sex,1,'1')
+        replace_all(sex,'F','0')
+        replace_all(sex,'f','0')
+        replace_all(sex,'M','1')
+        replace_all(sex,'m','1')
         return sex
 
 def with_index(seq):
