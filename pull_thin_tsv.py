@@ -46,6 +46,7 @@ v.0.6.8 - bug fix - was testing sex as logical 0/1, rather than numeric.
 v.0.6.9 - changed scoring of males in f2 crosses to folow scoring in bc. Examine only whether par1 > or < par2
 v.0.6.10 - bug fix - open files in Universal new line mode ('rU', which prevents error and failure to read phenofile). Unfortunately, code is buried in try statements, which hides this error from view. Should revise code to discard try statements.
 v.0.6.11 - bug fix - not correctly recognizing sex in sexfile and phenofile
+v.0.6.12 - bug fix - now properly recognizes .cfg file passed on command line
 """
 
 import sys
@@ -62,13 +63,22 @@ difffac = 0.01
 chroms = "all"
 
 
+#def main(argv=None):
 def main(argv=None):
         if argv is None:
+                argv = sys.argv
 #		print "hello"
-                config_file = "pt.cfg"
-        else:
-                config_file = argv
+
+                if argv is None:
+                        config_file = "pt.cfg"
+                else:
+                        config_file = argv[1]
+#        print argv
+#        print config_file
+
         #get parameters from config file
+         
+         
         config = ConfigParser.SafeConfigParser(allow_no_value=True)
         config.read(config_file)
         filePar2 = config.get('Common','filepar2')
@@ -317,6 +327,7 @@ def main(argv=None):
         else:
                 print "Creating csv file for f2 cross"
                 tsv2csv_f2(filePar2,filePar1,sex)
+
 
 # ---------------------------------------------------------
 # natsort.py: Natural string sorting.
