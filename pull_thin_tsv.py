@@ -69,7 +69,7 @@ def main(argv=None):
                 argv = sys.argv
 #		print "hello"
 
-                if argv is None:
+                if len(argv) == 1:
                         config_file = "pt.cfg"
                 else:
                         config_file = argv[1]
