@@ -55,6 +55,7 @@ import ConfigParser, os
 import csv
 import glob
 import time
+import re
 from operator import delitem 
 
 
@@ -83,7 +84,7 @@ def main(argv=None):
         config.read(config_file)
         filePar2 = config.get('Common','filepar2')
         sorted_filePar2=[]
-        for i in glob.iglob("*par2*sorted"):
+        for i in glob.iglob("*par*sorted"):
                 sorted_filePar2.append(i[:-7])
         if filePar2 in sorted_filePar2:
                 print "%s has been pre-sorted" %(filePar2)
@@ -93,21 +94,21 @@ def main(argv=None):
                 sort_file(filePar2,'\t')
         filePar2 = filePar2 + ".sorted"
         global cross
-        try:
+        if config.has_option('Common','cross'):
                 cross = config.get('Common','cross')
                 cross = cross.lower()
                 print "Cross type = %s" %(cross)
-        except:
+        else:
                 print "No cross type indicated. I will assume a backcross"
                 cross = 'bc'
                 #filePar1 = None
 
         if cross == 'f2':
         
-                try:
+                if config.has_option('Common','filepar1'):
                         filePar1 = config.get('Common','filepar1')
                         sorted_filePar1=[]
-                        for i in glob.iglob("*par1*sorted"):
+                        for i in glob.iglob("*par*sorted"):
                                 sorted_filePar1.append(i[:-7])
                         if filePar1 in sorted_filePar1:
                                 print "%s has been pre-sorted" %(filePar1)
@@ -116,14 +117,14 @@ def main(argv=None):
                                 print "Sorting %s" %(filePar1)
                                 sort_file(filePar1,'\t')
                         filePar1 = filePar1 + ".sorted"
-                except:
+                else:
                         print "No Par1 file processed for f2 cross. Run aborted."
                         sys.exit()
                         
 
         num_inds = count_lines(filePar2)
 
-        try:
+        if config.has_option('Common','indivs'):
                 indivs = config.get('Common','indivs')
 
                 if ',' in indivs:
@@ -132,12 +133,12 @@ def main(argv=None):
                         indivs = "All"
                 else:
                         indivs = indivs.split()
-        except:
+        else:
                 indivs = "All"
 
         print "Individuals = %s" %(indivs)
 
-        try:
+        if config.has_option('Common','sex_all'):
                 sex_all = config.get('Common','sex_all')
                 if 'f' in sex_all.lower() or '0' in sex_all:
                         sex_all = '0'
@@ -147,79 +148,108 @@ def main(argv=None):
                         sex_all = '1'
                         sex = sex_all2sex(num_inds,sex_all)
                         print "All individuals are male"
-        except:
-                try:
-                        phenofile = config.get('Common','phenofile')
-                        #if supplied, get sex of each individual (0 = F, 1 = M)
-                        
-                        sorted_phenofile=[]
-                        for i in glob.iglob("phenofile.sorted"):
-                                sorted_phenofile.append(i[:-7])
-                        if phenofile in sorted_phenofile:
-                                print "%s has been pre-sorted" %(phenofile)
-                                pass
-                        if phenofile not in sorted_phenofile:             
-                                sort_file(phenofile,'\t')
+        else:
+                print "No global sex indicated"
 
-                        sex = get_sex_phenofile(phenofile + ".sorted")
+        if config.has_option('Common','phenofile'):
+                phenofile = config.get('Common','phenofile')
+                #if supplied, get sex of each individual (0 = F, 1 = M)
+                
+                sorted_phenofile=[]
+                for i in glob.iglob(phenofile + ".sorted"):
+                        sorted_phenofile.append(i[:-7])
+                if phenofile in sorted_phenofile:
+                        print "%s has been pre-sorted" %(phenofile)
+                        pass
+                else:
+                        print "Sorting %s" %(phenofile)
+                        sort_file(phenofile,'\t')
+                ##Pull requested individuals from phenofile and/or sexfile
+                pre_pulled_phenofile=[]
+                for i in glob.iglob(phenofile + ".sorted.pulled"):
+                        pre_pulled_phenofile.append(i[:-14])
+                if phenofile in pre_pulled_phenofile:
+                        print "%s has been pre-pulled" %(phenofile)
+                        pass
+                else:#if file not yet pulled
+                        print "Pulling requested individuals from phenofile."
+                        if "All" not in indivs:#if user specified particular individuals
+                                pull_idds(phenofile + '.sorted',indivs)
+                        elif "All" in indivs:
+                                file_to_pulled(phenofile + '.sorted')#if request all, just paste file to new file with .pulled suffix       
 
-                except:
-                        try:
-                                sexfile = config.get('Common','sexfile')
-                                
-                                sorted_sexfile=[]
-                                for i in glob.iglob("sexfile.sorted"):
-                                        sorted_sexfile.append(i[:-7])
-                                if sexfile in sorted_sexfile:
-                                        print "%s has been pre-sorted" %(sexfile)
-                                        pass
-                                if sexfile not in sorted_sexfile:             
-                                        sort_file(sexfile,'\t')
-                                
-                                
-                                sex = get_sex_sexfile(sexfile + ".sorted")
-                        except:
-                                sex = []
-                                get_num_inds = open(filePar2,'rU')
-                                for line in get_num_inds:
-                                        sex.append('0')
+                if config.has_option('Common','sex_all'):
+                        pass
+                else:
+                        sex = get_sex_phenofile(phenofile + ".sorted.pulled")
 
-                                print "No file with sex supplied. I will assume all females"	
+        elif config.has_option('Common','sexfile'):
+                sexfile = config.get('Common','sexfile')
+                sorted_sexfile=[]
+                for i in glob.iglob(sexfile + ".sorted"):
+                        sorted_sexfile.append(i[:-7])
+                if sexfile in sorted_sexfile:
+                        print "%s has been pre-sorted" %(sexfile)
+                        pass
+                else:
+                        print "Sorting sexfile"
+                        sort_file(sexfile,'\t')
+                ##Pull requested individuals from phenofile and/or sexfile
+                pre_pulled_sexfile=[]
+                for i in glob.iglob(sexfile + ".sorted.pulled"):
+                        pre_pulled_sexfile.append(i[:-14])
+                if sexfile in pre_pulled_sexfile:
+                        print "%s has been pre-pulled" %(sexfile)
+                        pass
+                else:#if file not yet pulled
+                        print "Pulling requested individuals from sexfile."
+                        if "All" not in indivs:#if user specified particular individuals
+                                pull_idds(sexfile + '.sorted',indivs)
+                        elif "All" in indivs:
+                                file_to_pulled(sexfile + '.sorted')#if request all, just paste file to new file with .pulled suffix       
+                if config.has_option('Common','sex_all'):
+                        pass
+                sex = get_sex_phenofile(phenofile + ".sorted.pulled")
+        else:
+                sex = []
+                get_num_inds = open(filePar2,'rU')
+                for line in get_num_inds:
+                        sex.append('0')
+                get_num_inds.close()
+                print "No file with sex supplied. I will assume all females"	
+
 
         global difffac
-        try:
+        if config.has_option('Common','difffac'):
                 difffac = config.get('Common','difffac')
                 difffac = float(difffac)
-                print "Data will be thinned with difffac = %s" %(difffac)
-        except:
+        else:
                 difffac = 0.01
+        print "Data will be thinned with difffac = %s" %(difffac)
 
-        try:
+        if config.has_option('Common','chroms'):
                 chroms = config.get('Common','chroms')
                 if ',' in chroms:
                         chroms = chroms.replace(" ","").split(',')
                 else:
                         chroms = chroms.split()
                         print "Chromosomes to pull = %s" %(chroms)
-        except:
+        else:
                 print "No chromosomes specified. I will pull all"
                 chroms = "all"
 
-
-
-
         global auto_prior
         global X_prior
-        try:
+        if config.has_option('Common','autosome_prior'):
                 auto_prior = config.get('Common','autosome_prior')
                 auto_prior = float(auto_prior)
-                try:	
+                if config.has_option('Common','X_prior'):	
                         X_prior = config.get('Common','X_prior')
                         X_prior = float(X_prior)
-                except ConfigParser.NoOptionError:
+                else:
                         print "No X prior requested. X prior set to autosomal prior."
                         X_prior = auto_prior		
-        except ConfigParser.NoOptionError:
+        else:
                 print "No autosomal or X prior set"
                 auto_prior = False
                 X_prior = False
@@ -228,11 +258,10 @@ def main(argv=None):
         print "X chromosome prior to replace NAs = %s" %(X_prior)	
 
 
-
         ##Pull requested individuals from Par2
         ##check if existing pulled filePar2 == all filePar2
         pre_pulled_filePar2=[]
-        for i in glob.iglob("*par2*pulled"):
+        for i in glob.iglob("*par*pulled"):
                 pre_pulled_filePar2.append(i[:-7])
 #		print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_pulled_filePar2:
@@ -244,7 +273,7 @@ def main(argv=None):
                 elif "All" in indivs:
                         file_to_pulled(filePar2)#if request all, just paste file to new file with .pulled suffix
         pre_converted_filePar2=[]
-        for i in glob.iglob("*par2*.pulled.converted"):
+        for i in glob.iglob("*par*.pulled.converted"):
                 pre_converted_filePar2.append(i[:-17])
 #		print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_converted_filePar2:
@@ -258,7 +287,7 @@ def main(argv=None):
         ##check if existing pulled filePar1 == all filePar1
         if cross == 'f2':
                 pre_pulled_filePar1=[]
-                for i in glob.iglob("*par1*pulled"):
+                for i in glob.iglob("*par*pulled"):
                         pre_pulled_filePar1.append(i[:-7])
         #		print set(pre_pulled_filePar2), set(filePar2)
                 if filePar1 in pre_pulled_filePar1:
@@ -270,7 +299,7 @@ def main(argv=None):
                         elif "All" in indivs:
                                 file_to_pulled(filePar1)#if request all, just paste file to new file with .pulled suffix
                 pre_converted_filePar1=[]
-                for i in glob.iglob("*par1*.pulled.converted"):
+                for i in glob.iglob("*par*.pulled.converted"):
                         pre_converted_filePar1.append(i[:-17])
         #		print set(pre_pulled_filePar1), set(filePar1)
                 if filePar1 in pre_converted_filePar1:
@@ -282,7 +311,7 @@ def main(argv=None):
 
         ##Thin files based on numbers in Par2
         thinned_filePar2=[]#list of thinned filePar2
-        for i in glob.iglob("*par2*pulled.converted.thinned"):
+        for i in glob.iglob("*par*pulled.converted.thinned"):
                 thinned_filePar2.append(i[:-25])
 
         if filePar2 in thinned_filePar2:
@@ -297,7 +326,7 @@ def main(argv=None):
                         print "No difffac provided. Data not thinned."
         ##Then use index of thinned markers to thin Par1
         thinned_filePar1=[]#list of thinned filePar2
-        for i in glob.iglob("*par1*pulled.converted.thinned"):
+        for i in glob.iglob("*par*pulled.converted.thinned"):
                 thinned_filePar1.append(i[:-25])
         renamed_filePar1=[]
         if cross == 'f2':
@@ -310,7 +339,7 @@ def main(argv=None):
         ##Convert probs for f2
         if cross == 'f2':
                 f2_filePar1 = []
-                for i in glob.iglob("*par1*pulled.converted.thinned.f2_rqtl"):
+                for i in glob.iglob("*par*pulled.converted.thinned.f2_rqtl"):
                         f2_filePar1.append(i[:-33])
 
                 if filePar1 in f2_filePar1:
@@ -321,14 +350,20 @@ def main(argv=None):
 
 
         ##convert tsv to csv format, make hard calls
-        if cross == 'bc':
-                print "Creating csv file for bc"
-                tsv2csv_bc(filePar2,sex)
+        sortedcsv = []
+        for i in glob.iglob(filePar2 + ".csv"):
+                sortedcsv.append(i[:-4])
+        if filePar2 in sortedcsv:
+                print "csv created alrady"
         else:
-                print "Creating csv file for f2 cross"
-                tsv2csv_f2(filePar2,filePar1,sex)
+                if cross == 'bc':
+                        print "Creating csv file for bc."
+                        tsv2csv_bc(filePar2,sex)
+                else:
+                        print "Creating csv file for f2 cross."
+                        tsv2csv_f2(filePar2,filePar1,sex)
 
-
+        print "Done."
 # ---------------------------------------------------------
 # natsort.py: Natural string sorting.
 # ---------------------------------------------------------
@@ -382,8 +417,8 @@ def sort_file(infile,delim):
                 row = data_dict[x]
                 row.insert(0,x)
                 out_file.writerow(row)
-#        return outfile_name
-                
+        
+        
                 
 def f2_reduce_prob_slots(par2,par1,sex):
         '''
@@ -462,7 +497,7 @@ def f2_reduce_prob_slots(par2,par1,sex):
                         converted_file_par1.writerow(converted_row_data_par1)
 
                 ind += 1
-
+       
 def tsv2csv_bc(par2,sex):
         par2_thinned = par2 + ".pulled.converted.thinned"
         thinned_file = csv.reader(open(par2_thinned, 'rU'),delimiter = '\t')
@@ -512,6 +547,7 @@ def tsv2csv_bc(par2,sex):
 
                 csv_out.writerow(converted_markers)
 
+        
 def tsv2csv_f2(par2,par1,sex):
         par2_thinned = par2 + ".pulled.converted.thinned"#changed to sample from thinned, rather than f2_qtl data, to get female pgm calls correct
         par1_thinned = par1 + ".pulled.converted.thinned"
@@ -590,7 +626,10 @@ def tsv2csv_f2(par2,par1,sex):
                 x+=1
 
                 csv_out.writerow(converted_markers)
-
+        thinned_file_par2.close()
+        thinned_file_par1.close()
+        csv_out.close()
+        
 def sex_all2sex(num_inds,sex_all):
         sex=[]
         for ind in range(num_inds):
@@ -660,22 +699,26 @@ def pull_idds(sample_file,indivs):#filePar2,indivs):
         out_file = open(sample_file + ".pulled",'w')
         positions = open_file.readline()
         out_file.write(positions)
-        for indiv in indivs:
-                print indiv
-                open_file = open(sample_file,'rU')
-                for line in open_file:
-                        if indiv in line:
-                                ##CHECK FOR NOT ALL NA IN ROW
+        for line in open_file:
+                name = line.split()[0]
+                for ind in indivs:
+                        match = re.search(ind,name)
+                        if match:
                                 out_file.write(line)
+                                break
         open_file.close()
         out_file.close()
+
+def containsAny(str, set):
+    """Check whether 'str' contains ANY of the chars in 'set'"""
+    return 1 in [c in str for c in set]
 
 def file_to_pulled(sample_file):
         open_file = csv.reader(open(sample_file,'rU'),delimiter='\t')
         print_file = csv.writer(open(sample_file + ".pulled",'w'),delimiter='\t')
         for line in open_file:
                 print_file.writerow(line)
-
+        
 def NA2prior(sample_file,chroms,sex):
         #pull requested chromosomes
         #And convert NAs to priors
@@ -760,7 +803,6 @@ def NA2prior(sample_file,chroms,sex):
         converted_file = csv.writer(open(sample_file +".pulled.converted",'w'),delimiter='\t')
         for line in range(num_ids):
                 converted_file.writerow(temp_data[line])
-
 
 
 def thin(sample_file):
@@ -1009,7 +1051,6 @@ def thin_Par1(sample_file,col_del):
                 del_data[line].insert(0,idds[line])
                 thinned_file.writerow(del_data[line])
 
-
 def combine_filePar2(filePar2):
 #Find all chromosome names, put in list
         chrom_positions=[]
@@ -1082,6 +1123,7 @@ def combine_filePar2(filePar2):
         for line in final_array:
                 print_file.writerow(line)
 
+ 
 def count_lines(count_file):
         filename = open(count_file,'rU')
         x = 0

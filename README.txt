@@ -20,3 +20,5 @@ This utility will perform the following tasks
 3 - Can replace the NAs in the files with priors, which is useful for some downstream applications, such as R-QTL
 
 
+To Do:
+1 - Properly recognizes if *par2 files have been preprocessed, but does not recognize for *par1 files.
