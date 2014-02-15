@@ -626,9 +626,9 @@ def tsv2csv_f2(par2,par1,sex):
                 x+=1
 
                 csv_out.writerow(converted_markers)
-        thinned_file_par2.close()
-        thinned_file_par1.close()
-        csv_out.close()
+        #thinned_file_par2.close()
+        #thinned_file_par1.close()
+        #csv_out.close()
         
 def sex_all2sex(num_inds,sex_all):
         sex=[]
