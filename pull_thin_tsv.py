@@ -47,6 +47,7 @@ v.0.6.9 - changed scoring of males in f2 crosses to folow scoring in bc. Examine
 v.0.6.10 - bug fix - open files in Universal new line mode ('rU', which prevents error and failure to read phenofile). Unfortunately, code is buried in try statements, which hides this error from view. Should revise code to discard try statements.
 v.0.6.11 - bug fix - not correctly recognizing sex in sexfile and phenofile
 v.0.6.12 - bug fix - now properly recognizes .cfg file passed on command line
+v.0.6.13 - bug fix - Crashed if no prior assigned. Now force assignment to backcross prior if no prior assigned by user
 """
 
 import sys
@@ -250,9 +251,9 @@ def main(argv=None):
                         print "No X prior requested. X prior set to autosomal prior."
                         X_prior = auto_prior		
         else:
-                print "No autosomal or X prior set"
-                auto_prior = False
-                X_prior = False
+                print "No autosomal or X prior set. Both priors set to 0.5"
+                auto_prior = 0.5
+                X_prior = 0.5
 
         print "Autosomal prior to replace NAs = %s" %(auto_prior)
         print "X chromosome prior to replace NAs = %s" %(X_prior)	
@@ -765,7 +766,7 @@ def NA2prior(sample_file,chroms,sex):
                                 
                                 temp_data = replace_all_in_array(temp_data,"NA",auto_prior)
                         else:
-                                print "No autosome prior provided for your backcross. NAs not replaced."
+                                print "No autosome prior provided for your backcross. I assumed 0.5."
                 elif "f2" in cross:
                         if X_prior and sex:
                                 #replace male autosome with autosome_prior, X with 2*X_prior
@@ -793,9 +794,9 @@ def NA2prior(sample_file,chroms,sex):
                                 if auto_prior:
                                         temp_data = replace_all_in_array(temp_data,"NA",auto_prior)
                                 else:
-                                        print "No autosome prior provided for your backcross. NAs not replaced."
+                                        print "No autosome prior provided for your backcross. I assumed 0.5."
                         else:
-                                print "You failed to provide either/both X prior and sex for your F2 cross. NAs not replaced."
+                                print "You failed to provide either/both X prior and sex for your F2 cross. NAs replaced with 0.5."
 
 
 
