@@ -48,6 +48,7 @@ v.0.6.10 - bug fix - open files in Universal new line mode ('rU', which prevents
 v.0.6.11 - bug fix - not correctly recognizing sex in sexfile and phenofile
 v.0.6.12 - bug fix - now properly recognizes .cfg file passed on command line
 v.0.6.13 - bug fix - Crashed if no prior assigned. Now force assignment to backcross prior if no prior assigned by user
+v.0.6.14 - bug fix - Was not assigning X chromosme prior correctly for males
 """
 
 import sys
@@ -211,6 +212,8 @@ def main(argv=None):
                 if config.has_option('Common','sex_all'):
                         pass
                 sex = get_sex_phenofile(phenofile + ".sorted.pulled")
+        elif sex_all:
+                pass
         else:
                 sex = []
                 get_num_inds = open(filePar2,'rU')
@@ -775,8 +778,8 @@ def NA2prior(sample_file,chroms,sex):
                                 female_X_prior = X_prior
                                 column_num=0#keep column index
                                 for column in temp_data[0]:#takes column names from row 0
-                                        if column_num >0:#ignore column of names
-                                                if column.split(":")[0] in "X":#if marker on X
+                                        #if column_num >0:#ignore column of names
+                                                if column.split(":")[0] == "X":#if marker on X
                                                         row_num = 0
                                                         for row in temp_data:#for each row of data
                                                                 if row_num !=0:#ignore row 0, these are headers
