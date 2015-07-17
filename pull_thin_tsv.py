@@ -429,7 +429,8 @@ def f2_reduce_prob_slots(par2,par1,sex):
         FOR FEMALES, CONVERT PAR2 PROB SLOTS TO PAR12 PROB
         THAT IS, PUT PROBPAR1 + PROBPAR2 IN NEWPROBPAR1 (homozygous)
         THEN, PUT PROBPAR12 (1-NEWPROBPAR1) IN PROBPAR2 (heterozygous)
-        MALES STAY AS THEY ARE 
+        MALES STAY AS THEY ARE
+        Scale probabilities so sum to 1
         '''
         thinned_file_par2 = csv.reader(open(par2 + ".pulled.converted.thinned", 'rU'),delimiter = '\t')
         thinned_file_par1 = csv.reader(open(par1 + ".pulled.converted.thinned", 'rU'),delimiter = '\t')
@@ -455,15 +456,15 @@ def f2_reduce_prob_slots(par2,par1,sex):
                         converted_row_data_par1 = []
                         for par2_datum in row:
                                 par1_datum = par1_line[column]
-                                #if chromosomes[column] != "X":
-                                        #converted_row_data_par2.append(par2_datum)
-                                        #converted_row_data_par1.append(par1_datum)
-                                #elif chromosomes[column] == "X":
-                                        #prob_par1 = 1 - float(par2_datum)
-                                        #converted_row_data_par2.append(par2_datum)#het prob goes in par2 slot
-                                        #converted_row_data_par1.append(par1_datum)#homo prob goes in par1 slot
-                                converted_row_data_par2.append(par2_datum)
-                                converted_row_data_par1.append(par1_datum)
+                                if chromosomes[column] != "X":
+                                        converted_row_data_par2.append(par2_datum)
+                                        converted_row_data_par1.append(par1_datum)
+                                elif chromosomes[column] == "X":
+                                        prob_par1 = 1 - float(par2_datum)
+                                        converted_row_data_par2.append(par2_datum)#het prob goes in par2 slot
+                                        converted_row_data_par1.append(prob_par1)#homo prob goes in par1 slot
+                                #converted_row_data_par2.append(par2_datum)
+                                #converted_row_data_par1.append(par1_datum)
                                 column += 1
 
                         converted_file_par2.writerow(converted_row_data_par2)
