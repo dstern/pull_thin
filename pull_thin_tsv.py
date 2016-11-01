@@ -283,21 +283,24 @@ def main(argv=None):
                 pre_pulled_filePar2.append(i[:-7])
 #		print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_pulled_filePar2:
+                filePar2 = filePar2 + ".pulled"
                 print "%s has been pre-pulled" %(filePar2)
                 pass
-        if filePar2 not in pre_pulled_filePar2:#if file not yet pulled
+        else:#if file not yet pulled
                 if "All" not in indivs:#if user specified particular individuals
                         pull_idds(filePar2,indivs)
                 elif "All" in indivs:
                         file_to_pulled(filePar2)#if request all, just paste file to new file with .pulled suffix
+ 
         pre_converted_filePar2=[]
         for i in glob.iglob("*par*.pulled.converted"):
                 pre_converted_filePar2.append(i[:-17])
 #		print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_converted_filePar2:
+                filePar2 = filePar2 + ".converted"
                 print "%s has been pre-converted" %(filePar2)
                 pass
-        if filePar2 not in pre_converted_filePar2:#if file not yet pulled
+        else:#if file not yet converted and thinned
                 convert_and_thin(filePar2,chroms,sex,difffac,xchroms)
                 #NA2prior(filePar2,chroms,sex)
 
@@ -310,9 +313,10 @@ def main(argv=None):
                         pre_pulled_filePar1.append(i[:-7])
         #		print set(pre_pulled_filePar2), set(filePar2)
                 if filePar1 in pre_pulled_filePar1:
+                        filePar2 = filePar2 + ".pulled"
                         print "%s has been pre-pulled" %(filePar1)
                         pass
-                if filePar1 not in pre_pulled_filePar1:#if file not yet pulled
+                else:#if file not yet pulled
                         if "All" not in indivs:#if user specified particular individuals
                                 pull_idds(filePar1,indivs)
                         elif "All" in indivs:
@@ -322,9 +326,10 @@ def main(argv=None):
                         pre_converted_filePar1.append(i[:-17])
         #		print set(pre_pulled_filePar1), set(filePar1)
                 if filePar1 in pre_converted_filePar1:
+                        filePar2 = filePar2 + ".converted"
                         print "%s has been pre-converted" %(filePar1)
                         pass
-                if filePar1 not in pre_converted_filePar1:#if file not yet pulled
+                else:#if file not yet pulled
                         convert_and_thin(filePar1,chroms,sex,difffac,xchroms)
                         #NA2prior(filePar1,chroms,sex)
 
