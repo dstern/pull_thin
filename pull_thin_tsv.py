@@ -9,7 +9,7 @@ Python 2.7
 
 USAGE
 
-python pull_thin_tsv.0.5.1.py <config_file: default = pt.cfg> 
+python pull_thin_tsv.py <config_file: default = pt.cfg> 
 
 If no config_file provided, program looks for pt.cfg in same folder
 
@@ -49,6 +49,7 @@ v.0.6.11 - bug fix - not correctly recognizing sex in sexfile and phenofile
 v.0.6.12 - bug fix - now properly recognizes .cfg file passed on command line
 v.0.6.13 - bug fix - Crashed if no prior assigned. Now force assignment to backcross prior if no prior assigned by user
 v.0.6.14 - bug fix - Was not assigning X chromosme prior correctly for males
+v.0.7 - implement core computations (convert and thin) in numpy - 1 Nov 2016
 """
 
 import sys
@@ -58,13 +59,14 @@ import csv
 import glob
 import time
 import re
+import numpy as np
 from operator import delitem 
 
 
 #default values
 difffac = 0.01
 chroms = "all"
-
+xchroms = "X"
 
 #def main(argv=None):
 def main(argv=None):
@@ -124,7 +126,7 @@ def main(argv=None):
                         sys.exit()
                         
 
-        num_inds = count_lines(filePar2)
+        num_inds = count_lines(filePar2) - 1
 
         if config.has_option('Common','indivs'):
                 indivs = config.get('Common','indivs')
@@ -211,7 +213,7 @@ def main(argv=None):
                                 file_to_pulled(sexfile + '.sorted')#if request all, just paste file to new file with .pulled suffix       
                 if config.has_option('Common','sex_all'):
                         pass
-                sex = get_sex_phenofile(phenofile + ".sorted.pulled")
+                sex = get_sex_phenofile(sexfile + ".sorted.pulled")
         elif sex_all:
                 pass
         else:
@@ -230,6 +232,18 @@ def main(argv=None):
         else:
                 difffac = 0.01
         print "Data will be thinned with difffac = %s" %(difffac)
+
+        if config.has_option('Common','xchroms'):
+                xchroms = config.get('Common','xchroms')
+                if ',' in xchroms:
+                        xchroms = xchroms.replace(" ","").split(',')
+                else:
+                        xchroms = xchroms.split()
+                        print "Specified X chromosomes = %s" %(xchroms)
+        else:
+                print "No X chromosome specified. All chroms treated as autosomes"
+                xchroms = "all"
+
 
         if config.has_option('Common','chroms'):
                 chroms = config.get('Common','chroms')
@@ -284,7 +298,8 @@ def main(argv=None):
                 print "%s has been pre-converted" %(filePar2)
                 pass
         if filePar2 not in pre_converted_filePar2:#if file not yet pulled
-                NA2prior(filePar2,chroms,sex)
+                convert_and_thin(filePar2,chroms,sex,difffac,xchroms)
+                #NA2prior(filePar2,chroms,sex)
 
 
         ##If Par1 present, then pull requested individuals from Par1
@@ -310,35 +325,36 @@ def main(argv=None):
                         print "%s has been pre-converted" %(filePar1)
                         pass
                 if filePar1 not in pre_converted_filePar1:#if file not yet pulled
-                        NA2prior(filePar1,chroms,sex)
+                        convert_and_thin(filePar1,chroms,sex,difffac,xchroms)
+                        #NA2prior(filePar1,chroms,sex)
 
 
         ##Thin files based on numbers in Par2
-        thinned_filePar2=[]#list of thinned filePar2
-        for i in glob.iglob("*par*pulled.converted.thinned"):
-                thinned_filePar2.append(i[:-25])
+        #thinned_filePar2=[]#list of thinned filePar2
+        #for i in glob.iglob("*par*pulled.converted.thinned"):
+                #thinned_filePar2.append(i[:-25])
 
-        if filePar2 in thinned_filePar2:
-                print "Parent 2 has been thinned already."
-        elif filePar2 not in thinned_filePar2:
-                if difffac:
-                        if auto_prior or X_prior:
-                                col_del = thin(filePar2)#thin file with difffac, return col_del for potential use to thing Par1
-                        else:
-                                col_del = thin_NA(filePar2)#thin file with difffac, return col_del for potential use to thing Par1			
-                else:
-                        print "No difffac provided. Data not thinned."
-        ##Then use index of thinned markers to thin Par1
-        thinned_filePar1=[]#list of thinned filePar2
-        for i in glob.iglob("*par*pulled.converted.thinned"):
-                thinned_filePar1.append(i[:-25])
-        renamed_filePar1=[]
-        if cross == 'f2':
-                if filePar1 in thinned_filePar1:
-                        print "Parent 1 has been thinned already."
-                elif filePar1 not in thinned_filePar1:#if not yet thinned
-                        if difffac:
-                                thin_Par1(filePar1,col_del)#thin file with difffac, return col_del for potential use to thing Par1
+        #if filePar2 in thinned_filePar2:
+                #print "Parent 2 has been thinned already."
+        #elif filePar2 not in thinned_filePar2:
+                #if difffac:
+                        #if auto_prior or X_prior:
+                                #col_del = thin(filePar2)#thin file with difffac, return col_del for potential use to thin Par1
+                        #else:
+                                #col_del = thin_NA(filePar2)#thin file with difffac, return col_del for potential use to thin Par1			
+                #else:
+                        #print "No difffac provided. Data not thinned."
+        ###Then use index of thinned markers to thin Par1
+        #thinned_filePar1=[]#list of thinned filePar2
+        #for i in glob.iglob("*par*pulled.converted.thinned"):
+                #thinned_filePar1.append(i[:-25])
+        #renamed_filePar1=[]
+        #if cross == 'f2':
+                #if filePar1 in thinned_filePar1:
+                        #print "Parent 1 has been thinned already."
+                #elif filePar1 not in thinned_filePar1:#if not yet thinned
+                        #if difffac:
+                                #thin_Par1(filePar1,col_del)#thin file with difffac, return col_del for potential use to thin Par1
 
         ##Convert probs for f2
         if cross == 'f2':
@@ -723,7 +739,127 @@ def file_to_pulled(sample_file):
         print_file = csv.writer(open(sample_file + ".pulled",'w'),delimiter='\t')
         for line in open_file:
                 print_file.writerow(line)
+ 
+def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
+        #for testinG
+        #import numpy as np
+        #sample_file="testpar1.tsv.sorted.pulled"
+        #difffac = 0.1
+        #chroms = ("1","X")
+        #X_prior = 0.5
+        #auto_prior = 0.25
+        #sex = [1,1,1,0,0,0]
+        #xchroms = 'X'
         
+        #make numpy array of global sex
+        #'sex' identifies sex of each individual
+        sexarray = np.array(sex)#convert to numpy array for boolean search
+        
+        #get row and column #s
+        with open(sample_file) as f:
+                ncols = len(f.readline().split()) + 1
+                nrows = sum(1 for _ in f)
+        
+        #read first row of *pulled tsv file to get chroms and positions
+        
+        markers = np.genfromtxt(sample_file, max_rows=1, delimiter="\t",dtype='S')
+        markers = np.delete(markers, 0, axis=0)
+        
+        #read first column
+        
+        inds = np.genfromtxt(sample_file,comments='#', delimiter="\t", 
+                             usecols=0, usemask=False, loose=True, 
+                             invalid_raise=True, max_rows=None, dtype='S')        
+        
+        #read second column to end, skipping first row to get data
+        
+        pp = np.genfromtxt(sample_file, skip_header=1,comments='#', delimiter="\t", missing_values="NA", 
+                           filling_values=np.nan, usecols=range(1,ncols), usemask=False, loose=True, 
+                           invalid_raise=True, max_rows=None)
+        
+        #ADD IF CHROMS == ALL, LIST ALL CHROMS IN chroms
+        if "all" in chroms:
+                ch = []
+                m = np.char.rsplit(markers, sep=":", maxsplit=None)
+                for i in m:
+                        ch.append(i[0])
+                chroms = np.unique(np.array(ch))
+                
+        
+        #PULL OUT ARRAY FOR EACH CHROMOSOME
+        for chr in chroms:
+                chr_columns = np.char.find(markers, chr + ":") == 0
+        
+                #SUBSET TOTAL ARRAY BASED ON INDICES IN CHR_COLUMNS
+        
+                marker_subset = markers[chr_columns]
+                ppsubset = np.array(pp[:,chr_columns])
+        
+                #for each chrom, place first column
+                ppthinned = np.empty((nrows, 1))
+                ppthinned[:,0] = ppsubset[:,0]
+                markersthinned = np.empty((1,1),dtype = object)
+                markersthinned[0,0] = marker_subset[0]
+        
+                subset_ncols = np.shape(ppsubset)[1]
+                #select appropriate intermediate columns
+                for col in range(0,subset_ncols-2): 
+                        #print col
+                        if np.allclose(ppsubset[:,col],ppsubset[:,col+1],atol=difffac,equal_nan=True) and np.allclose(ppsubset[:,col],ppsubset[:,col+2],atol=difffac*2,equal_nan=True):#if first col similar to both next and next + 1 col
+                                pass #skip
+                        else:#if next and next next are different, keep next
+                                push = np.empty((nrows,1))#define array
+                                push[:,0] = ppsubset[:,col+1]#fill array with 1 column
+                                ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
+                                markerpush = np.empty((1,1),dtype=object)
+                                markerpush[0] = marker_subset[col+1]
+                                markersthinned = np.concatenate((markersthinned,markerpush),axis=0)
+                #ADD LAST COLUMN
+                push = np.empty((nrows,1))#define array
+                push[:,0] = ppsubset[:,col+2]#fill array with 1 column
+                ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
+                markerpush = np.empty((1,1),dtype=object)
+                markerpush[0] = marker_subset[col+2]
+                markersthinned = np.concatenate((markersthinned,markerpush),axis=0) 
+        
+        
+        
+                #convert NAs to priors
+                if chr in xchroms: #X_prior
+
+                        malerows = sexarray=='1'
+                        femalerows = sexarray=='0'
+                        
+                        malerows = np.repeat(malerows, np.shape(markersthinned)[0],axis=0).reshape(-1,np.shape(markersthinned)[0])
+                        femalerows = np.repeat(femalerows, np.shape(markersthinned)[0],axis=0).reshape(-1,np.shape(markersthinned)[0])        
+                        ppthinned[np.isnan(ppthinned) & malerows] = X_prior * 2
+                        ppthinned[np.isnan(ppthinned) & femalerows] = X_prior
+                else: #autosomal #auto_prior
+                        ppthinned[np.isnan(ppthinned)] = auto_prior
+        
+        
+                #print ppthinned
+                #CONCATENATE ARRAYS FOR ALL CHROMOSOMES
+                if chr == chroms[0]:
+                        ppout = ppthinned
+                        markers_out = markersthinned
+                else:
+                        ppout = np.concatenate((ppout,ppthinned),axis=1)
+                        markers_out = np.concatenate((markers_out,markersthinned),axis=0)
+        #    print ppout
+        #    print markers_out
+        
+        #CONCATENATE MARKERS AND PP
+        
+        markedppout = np.concatenate((np.transpose(markers_out),ppout),axis=0)
+        inds = np.reshape(inds, (np.size(inds),1))
+        outarray = np.concatenate((inds,markedppout),axis=1)
+        #print outarray
+        #WRITE FILE WITH PULLED CONVERTED THINNED DATA
+        
+        np.savetxt(sample_file +".pulled.converted.thinned", outarray, delimiter='\t', newline='\n',fmt = '%s')
+
+
 def NA2prior(sample_file,chroms,sex):
         #pull requested chromosomes
         #And convert NAs to priors
