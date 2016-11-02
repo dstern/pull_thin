@@ -283,7 +283,7 @@ def main(argv=None):
                 pre_pulled_filePar2.append(i[:-7])
 #		print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_pulled_filePar2:
-                filePar2 = filePar2 + ".pulled"
+                #filePar2 = filePar2 + ".pulled"
                 print "%s has been pre-pulled" %(filePar2)
                 pass
         else:#if file not yet pulled
@@ -291,7 +291,8 @@ def main(argv=None):
                         pull_idds(filePar2,indivs)
                 elif "All" in indivs:
                         file_to_pulled(filePar2)#if request all, just paste file to new file with .pulled suffix
- 
+                #filePar2 = filePar2 + ".pulled"
+                
         pre_converted_filePar2=[]
         for i in glob.iglob("*par*.pulled.converted"):
                 pre_converted_filePar2.append(i[:-17])
@@ -301,7 +302,8 @@ def main(argv=None):
                 print "%s has been pre-converted" %(filePar2)
                 pass
         else:#if file not yet converted and thinned
-                convert_and_thin(filePar2,chroms,sex,difffac,xchroms)
+                print "Converting and thinning file"
+                convert_and_thin(filePar2 + ".pulled",chroms,sex,difffac,xchroms)
                 #NA2prior(filePar2,chroms,sex)
 
 
@@ -313,7 +315,7 @@ def main(argv=None):
                         pre_pulled_filePar1.append(i[:-7])
         #		print set(pre_pulled_filePar2), set(filePar2)
                 if filePar1 in pre_pulled_filePar1:
-                        filePar2 = filePar2 + ".pulled"
+                        filePar1 = filePar1 + ".pulled"
                         print "%s has been pre-pulled" %(filePar1)
                         pass
                 else:#if file not yet pulled
@@ -326,11 +328,13 @@ def main(argv=None):
                         pre_converted_filePar1.append(i[:-17])
         #		print set(pre_pulled_filePar1), set(filePar1)
                 if filePar1 in pre_converted_filePar1:
-                        filePar2 = filePar2 + ".converted"
+                        filePar1 = filePar1 + ".converted"
                         print "%s has been pre-converted" %(filePar1)
                         pass
                 else:#if file not yet pulled
-                        convert_and_thin(filePar1,chroms,sex,difffac,xchroms)
+                        print "Converting and thinning parent1"
+                        convert_and_thin_Par1(filePar2 + ".pulled.converted.thinned",filePar1 + ".pulled",sex,chroms,xchroms)
+                        #convert_and_thin(filePar1,chroms,sex,difffac,xchroms)
                         #NA2prior(filePar1,chroms,sex)
 
 
@@ -766,62 +770,81 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
                 nrows = sum(1 for _ in f)
         
         #read first row of *pulled tsv file to get chroms and positions
-        
+        print "reading markers"
         markers = np.genfromtxt(sample_file, max_rows=1, delimiter="\t",dtype='S')
         markers = np.delete(markers, 0, axis=0)
         
         #read first column
-        
+        print "reading individual names"
         inds = np.genfromtxt(sample_file,comments='#', delimiter="\t", 
                              usecols=0, usemask=False, loose=True, 
                              invalid_raise=True, max_rows=None, dtype='S')        
         
         #read second column to end, skipping first row to get data
         
-        pp = np.genfromtxt(sample_file, skip_header=1,comments='#', delimiter="\t", missing_values="NA", 
-                           filling_values=np.nan, usecols=range(1,ncols), usemask=False, loose=True, 
-                           invalid_raise=True, max_rows=None)
+        #pp = np.genfromtxt(sample_file, skip_header=1,comments='#', delimiter="\t", missing_values="NA", 
+                           #filling_values=np.nan, usecols=range(1,ncols), usemask=False, loose=True, 
+                           #invalid_raise=True, max_rows=None)
         
-        #ADD IF CHROMS == ALL, LIST ALL CHROMS IN chroms
+        #get chromosomes from all markers
+        ch = []
+        m = np.char.rsplit(markers, sep=":", maxsplit=None)
+        for i in m:
+                ch.append(i[0]) #ch is list of chromosomes for each marker
+        ch = np.array(ch)
+
+        #IF CHROMS == ALL, LIST ALL CHROMS IN chroms
         if "all" in chroms:
-                ch = []
-                m = np.char.rsplit(markers, sep=":", maxsplit=None)
-                for i in m:
-                        ch.append(i[0])
-                chroms = np.unique(np.array(ch))
+                chroms = np.unique(ch)
+
                 
         
         #PULL OUT ARRAY FOR EACH CHROMOSOME
         for chr in chroms:
+                print "Thinning chromosome %s" %(chr)
                 chr_columns = np.char.find(markers, chr + ":") == 0
         
                 #SUBSET TOTAL ARRAY BASED ON INDICES IN CHR_COLUMNS
         
                 marker_subset = markers[chr_columns]
-                ppsubset = np.array(pp[:,chr_columns])
+#                ppsubset = np.array(pp[:,chr_columns])
+
+                #GRAB CHROMOSOME FROM FILE
+                chr_indices = np.where(ch==chr)
+                chr_indices = np.squeeze(chr_indices)
+                chr_indices = chr_indices + 1 #shift over one to allow for marker names
+        
+                pp = np.genfromtxt(sample_file, skip_header=1,comments='#', delimiter="\t", missing_values="NA", 
+                                   filling_values=np.nan, usecols=chr_indices, usemask=False, loose=True, 
+                                   invalid_raise=True, max_rows=None)
         
                 #for each chrom, place first column
                 ppthinned = np.empty((nrows, 1))
-                ppthinned[:,0] = ppsubset[:,0]
+#                ppthinned[:,0] = ppsubset[:,0]
+                ppthinned[:,0] = pp[:,0]
                 markersthinned = np.empty((1,1),dtype = object)
                 markersthinned[0,0] = marker_subset[0]
         
-                subset_ncols = np.shape(ppsubset)[1]
+#                subset_ncols = np.shape(ppsubset)[1]
+                subset_ncols = np.shape(pp)[1]
                 #select appropriate intermediate columns
                 for col in range(0,subset_ncols-2): 
                         #print col
-                        if np.allclose(ppsubset[:,col],ppsubset[:,col+1],atol=difffac,equal_nan=True) and np.allclose(ppsubset[:,col],ppsubset[:,col+2],atol=difffac*2,equal_nan=True):#if first col similar to both next and next + 1 col
+#                        if np.allclose(ppsubset[:,col],ppsubset[:,col+1],atol=difffac,equal_nan=True) and np.allclose(ppsubset[:,col],ppsubset[:,col+2],atol=difffac*2,equal_nan=True):#if first col similar to both next and next + 1 col
+                        if np.allclose(pp[:,col],pp[:,col+1],atol=difffac,equal_nan=True) and np.allclose(pp[:,col],pp[:,col+2],atol=difffac*2,equal_nan=True):#if first col similar to both next and next + 1 col
                                 pass #skip
                         else:#if next and next next are different, keep next
                                 push = np.empty((nrows,1))#define array
-                                push[:,0] = ppsubset[:,col+1]#fill array with 1 column
+#                                push[:,0] = ppsubset[:,col+1]#fill array with 1 column
+                                push[:,0] = pp[:,col+1]#fill array with 1 column                                
                                 ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
                                 markerpush = np.empty((1,1),dtype=object)
                                 markerpush[0] = marker_subset[col+1]
                                 markersthinned = np.concatenate((markersthinned,markerpush),axis=0)
                 #ADD LAST COLUMN
                 push = np.empty((nrows,1))#define array
-                push[:,0] = ppsubset[:,col+2]#fill array with 1 column
+#                push[:,0] = ppsubset[:,col+2]#fill array with 1 column
+                push[:,0] = pp[:,col+2]#fill array with 1 column
                 ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
                 markerpush = np.empty((1,1),dtype=object)
                 markerpush[0] = marker_subset[col+2]
@@ -831,9 +854,11 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
         
                 #convert NAs to priors
                 if chr in xchroms: #X_prior
-
+                        #print "sexarray=%s" %(sexarray)
                         malerows = sexarray=='1'
                         femalerows = sexarray=='0'
+                        #print "malerows=%s" %(malerows)
+                        #print "femalerows=%s" %(femalerows)
                         
                         malerows = np.repeat(malerows, np.shape(markersthinned)[0],axis=0).reshape(-1,np.shape(markersthinned)[0])
                         femalerows = np.repeat(femalerows, np.shape(markersthinned)[0],axis=0).reshape(-1,np.shape(markersthinned)[0])        
@@ -862,8 +887,59 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
         #print outarray
         #WRITE FILE WITH PULLED CONVERTED THINNED DATA
         
-        np.savetxt(sample_file +".pulled.converted.thinned", outarray, delimiter='\t', newline='\n',fmt = '%s')
+        np.savetxt(sample_file +".converted.thinned", outarray, delimiter='\t', newline='\n',fmt = '%s')
 
+        
+def convert_and_thin_Par1(filePar2,filePar1,sex,chroms,xchroms):
+        #grab first row of filePar2 and filePar2
+        markersP2 = np.genfromtxt(filePar2, max_rows=1, delimiter="\t",dtype='S')
+        markersP1 = np.genfromtxt(filePar1, max_rows=1, delimiter="\t",dtype='S')
+        
+        #compare and keep indices of filePar1 that match filePar2
+        grab_idx = np.searchsorted(markersP1,markersP2)
+
+        #read in sub_array based on grab_idx
+        ppthinned = np.genfromtxt(filePar1, delimiter="\t", missing_values="NA", 
+                           filling_values=np.nan, usecols=grab_idx, usemask=False, loose=True, 
+                           invalid_raise=True, max_rows=None,dtype=object)
+        #replace nan with prior
+        #convert NAs to priors
+        sexarray = np.array(sex)#convert to numpy array for boolean search
+        
+        if "all" in chroms:
+                ch = []
+                m = np.char.rsplit(markersP2[1:], sep=":", maxsplit=None)
+                for i in m:
+                        ch.append(i[0]) #ch is list of chromosomes for each marker
+                ch = np.array(ch)
+                chroms = np.unique(ch)
+        
+                #define male and female rows
+                malerows = sexarray=='1'
+                femalerows = sexarray=='0'
+                #make arrays
+                malerows = np.repeat(malerows, np.shape(markersP2)[0],axis=0).reshape(-1,np.shape(markersP2)[0])
+                malerows = np.insert(malerows, 0, np.zeros(np.shape(markersP2)[0],dtype=bool)).reshape(-1,np.shape(markersP2)[0])#add column at top
+                femalerows = np.repeat(femalerows, np.shape(markersP2)[0],axis=0).reshape(-1,np.shape(markersP2)[0])        
+                femalerows = np.insert(femalerows, 0, np.zeros(np.shape(markersP2)[0],dtype=bool)).reshape(-1,np.shape(markersP2)[0])#add column at top
+                
+                #define X chrom columns
+                ch = np.insert(ch,0,'') #insert blank value at beginning (genotype column)
+                xch_idx = xchroms == ch
+                #make array
+                xchromcolumns = np.tile(xch_idx, np.shape(malerows)[0]).reshape(-1,np.shape(malerows)[1])
+
+
+                ppthinned[(ppthinned == 'NA') & malerows & xchromcolumns] = X_prior * 2
+                ppthinned[(ppthinned == 'NA') & femalerows & xchromcolumns] = X_prior
+
+                #define all other NA as autosomal
+                ppthinned[(ppthinned == 'NA')] = auto_prior
+        
+        #print out new thinned Par2
+        np.savetxt(filePar1 +".converted.thinned", ppthinned, delimiter='\t', newline='\n',fmt = '%s')
+        
+        
 
 def NA2prior(sample_file,chroms,sex):
         #pull requested chromosomes
