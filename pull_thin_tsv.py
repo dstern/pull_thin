@@ -126,7 +126,6 @@ def main(argv=None):
                         sys.exit()
                         
 
-        num_inds = count_lines(filePar2) - 1
 
         if config.has_option('Common','indivs'):
                 indivs = config.get('Common','indivs')
@@ -142,18 +141,20 @@ def main(argv=None):
 
         print "Individuals = %s" %(indivs)
 
-        if config.has_option('Common','sex_all'):
-                sex_all = config.get('Common','sex_all')
-                if 'f' in sex_all.lower() or '0' in sex_all:
-                        sex_all = '0'
-                        sex = sex_all2sex(num_inds,sex_all)
-                        print "All individuals are female"
-                elif 'm' in sex_all.lower() or '1' in sex_all:
-                        sex_all = '1'
-                        sex = sex_all2sex(num_inds,sex_all)
-                        print "All individuals are male"
-        else:
-                print "No global sex indicated"
+        #num_inds = count_lines(filePar2) - 1
+
+        #if config.has_option('Common','sex_all'):
+                #sex_all = config.get('Common','sex_all')
+                #if 'f' in sex_all.lower() or '0' in sex_all:
+                        #sex_all = '0'
+                        #sex = sex_all2sex(num_inds,sex_all)
+                        #print "All individuals are female"
+                #elif 'm' in sex_all.lower() or '1' in sex_all:
+                        #sex_all = '1'
+                        #sex = sex_all2sex(num_inds,sex_all)
+                        #print "All individuals are male"
+        #else:
+                #print "No global sex indicated"
 
         if config.has_option('Common','phenofile'):
                 phenofile = config.get('Common','phenofile')
@@ -214,8 +215,8 @@ def main(argv=None):
                 if config.has_option('Common','sex_all'):
                         pass
                 sex = get_sex_phenofile(sexfile + ".sorted.pulled")
-        elif sex_all:
-                pass
+        #elif sex_all:
+                #pass
         else:
                 sex = []
                 get_num_inds = open(filePar2,'rU')
@@ -283,7 +284,7 @@ def main(argv=None):
                 pre_pulled_filePar2.append(i[:-7])
 #		print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_pulled_filePar2:
-                #filePar2 = filePar2 + ".pulled"
+                filePar2 = filePar2 + ".pulled"
                 print "%s has been pre-pulled" %(filePar2)
                 pass
         else:#if file not yet pulled
@@ -291,8 +292,26 @@ def main(argv=None):
                         pull_idds(filePar2,indivs)
                 elif "All" in indivs:
                         file_to_pulled(filePar2)#if request all, just paste file to new file with .pulled suffix
-                #filePar2 = filePar2 + ".pulled"
+                filePar2 = filePar2 + ".pulled"
+        
+
+        num_inds = count_lines(filePar2) - 1
+
+        if config.has_option('Common','sex_all'):
+                sex_all = config.get('Common','sex_all')
+                if 'f' in sex_all.lower() or '0' in sex_all:
+                        sex_all = '0'
+                        sex = sex_all2sex(num_inds,sex_all)
+                        print "All individuals are female"
+                elif 'm' in sex_all.lower() or '1' in sex_all:
+                        sex_all = '1'
+                        sex = sex_all2sex(num_inds,sex_all)
+                        print "All individuals are male"
+        else:
+                print "No global sex indicated"
+
                 
+        
         pre_converted_filePar2=[]
         for i in glob.iglob("*par*.pulled.converted"):
                 pre_converted_filePar2.append(i[:-17])
@@ -303,7 +322,7 @@ def main(argv=None):
                 pass
         else:#if file not yet converted and thinned
                 print "Converting and thinning file"
-                convert_and_thin(filePar2 + ".pulled",chroms,sex,difffac,xchroms)
+                convert_and_thin(filePar2 ,chroms,sex,difffac,xchroms)
                 #NA2prior(filePar2,chroms,sex)
 
 
@@ -323,6 +342,7 @@ def main(argv=None):
                                 pull_idds(filePar1,indivs)
                         elif "All" in indivs:
                                 file_to_pulled(filePar1)#if request all, just paste file to new file with .pulled suffix
+                        filePar1 = filePar1 + ".pulled"
                 pre_converted_filePar1=[]
                 for i in glob.iglob("*par*.pulled.converted"):
                         pre_converted_filePar1.append(i[:-17])
@@ -333,7 +353,7 @@ def main(argv=None):
                         pass
                 else:#if file not yet pulled
                         print "Converting and thinning parent1"
-                        convert_and_thin_Par1(filePar2 + ".pulled.converted.thinned",filePar1 + ".pulled",sex,chroms,xchroms)
+                        convert_and_thin_Par1(filePar2 + ".converted.thinned",filePar1,sex,chroms,xchroms)
                         #convert_and_thin(filePar1,chroms,sex,difffac,xchroms)
                         #NA2prior(filePar1,chroms,sex)
 
@@ -457,11 +477,11 @@ def f2_reduce_prob_slots(par2,par1,sex):
         MALES STAY AS THEY ARE
         Scale probabilities so sum to 1
         '''
-        thinned_file_par2 = csv.reader(open(par2 + ".pulled.converted.thinned", 'rU'),delimiter = '\t')
-        thinned_file_par1 = csv.reader(open(par1 + ".pulled.converted.thinned", 'rU'),delimiter = '\t')
+        thinned_file_par2 = csv.reader(open(par2 + ".converted.thinned", 'rU'),delimiter = '\t')
+        thinned_file_par1 = csv.reader(open(par1 + ".converted.thinned", 'rU'),delimiter = '\t')
 
-        converted_file_par2 = csv.writer(open(par2 + ".pulled.converted.thinned.f2_rqtl", "w"), delimiter = '\t')
-        converted_file_par1 = csv.writer(open(par1 + ".pulled.converted.thinned.f2_rqtl", "w"), delimiter = '\t')
+        converted_file_par2 = csv.writer(open(par2 + ".converted.thinned.f2_rqtl", "w"), delimiter = '\t')
+        converted_file_par1 = csv.writer(open(par1 + ".converted.thinned.f2_rqtl", "w"), delimiter = '\t')
 
         header = thinned_file_par2.next()
         skip = thinned_file_par1.next()
@@ -579,8 +599,8 @@ def tsv2csv_bc(par2,sex):
 
         
 def tsv2csv_f2(par2,par1,sex):
-        par2_thinned = par2 + ".pulled.converted.thinned"#changed to sample from thinned, rather than f2_qtl data, to get female pgm calls correct
-        par1_thinned = par1 + ".pulled.converted.thinned"
+        par2_thinned = par2 + ".converted.thinned"#changed to sample from thinned, rather than f2_qtl data, to get female pgm calls correct
+        par1_thinned = par1 + ".converted.thinned"
         thinned_file_par2 = csv.reader(open(par2_thinned, 'rU'),delimiter = '\t')
         thinned_file_par1 = csv.reader(open(par1_thinned, 'rU'),delimiter = '\t')
         csv_out = csv.writer(open(par2 + ".csv", "w"), delimiter = ',')
@@ -820,22 +840,18 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
         
                 #for each chrom, place first column
                 ppthinned = np.empty((nrows, 1))
-#                ppthinned[:,0] = ppsubset[:,0]
                 ppthinned[:,0] = pp[:,0]
                 markersthinned = np.empty((1,1),dtype = object)
                 markersthinned[0,0] = marker_subset[0]
         
-#                subset_ncols = np.shape(ppsubset)[1]
                 subset_ncols = np.shape(pp)[1]
                 #select appropriate intermediate columns
                 for col in range(0,subset_ncols-2): 
                         #print col
-#                        if np.allclose(ppsubset[:,col],ppsubset[:,col+1],atol=difffac,equal_nan=True) and np.allclose(ppsubset[:,col],ppsubset[:,col+2],atol=difffac*2,equal_nan=True):#if first col similar to both next and next + 1 col
                         if np.allclose(pp[:,col],pp[:,col+1],atol=difffac,equal_nan=True) and np.allclose(pp[:,col],pp[:,col+2],atol=difffac*2,equal_nan=True):#if first col similar to both next and next + 1 col
                                 pass #skip
                         else:#if next and next next are different, keep next
                                 push = np.empty((nrows,1))#define array
-#                                push[:,0] = ppsubset[:,col+1]#fill array with 1 column
                                 push[:,0] = pp[:,col+1]#fill array with 1 column                                
                                 ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
                                 markerpush = np.empty((1,1),dtype=object)
@@ -843,13 +859,21 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
                                 markersthinned = np.concatenate((markersthinned,markerpush),axis=0)
                 #ADD LAST COLUMN
                 push = np.empty((nrows,1))#define array
-#                push[:,0] = ppsubset[:,col+2]#fill array with 1 column
-                push[:,0] = pp[:,col+2]#fill array with 1 column
-                ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
-                markerpush = np.empty((1,1),dtype=object)
-                markerpush[0] = marker_subset[col+2]
-                markersthinned = np.concatenate((markersthinned,markerpush),axis=0) 
-        
+                if subset_ncols == 1:
+                        pass #proceed with 1 column of data
+                else:
+                        if subset_ncols == 2: #only 2 columns, grab second
+                                push[:,0] = pp[:,1]
+                                markerpush = np.empty((1,1),dtype=object)
+                                markerpush[0] = marker_subset[1]
+                        else:
+                                push[:,0] = pp[:,col+2]#fill array with last column
+                                markerpush = np.empty((1,1),dtype=object)
+                                markerpush[0] = marker_subset[col+2]                                
+                
+                        ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
+                        markersthinned = np.concatenate((markersthinned,markerpush),axis=0) 
+                
         
         
                 #convert NAs to priors
