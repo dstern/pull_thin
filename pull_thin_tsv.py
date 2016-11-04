@@ -344,12 +344,12 @@ def main(argv=None):
                                 file_to_pulled(filePar1)#if request all, just paste file to new file with .pulled suffix
                         filePar1 = filePar1 + ".pulled"
                 pre_converted_filePar1=[]
-                for i in glob.iglob("*par*.pulled.converted"):
+                for i in glob.iglob("*par*.pulled.converted.thinned"):
                         pre_converted_filePar1.append(i[:-17])
         #		print set(pre_pulled_filePar1), set(filePar1)
                 if filePar1 in pre_converted_filePar1:
-                        filePar1 = filePar1 + ".converted"
-                        print "%s has been pre-converted" %(filePar1)
+                        filePar1 = filePar1 + ".converted.thinned"
+                        print "%s has been thinned" %(filePar1)
                         pass
                 else:#if file not yet pulled
                         print "Converting and thinning parent1"
