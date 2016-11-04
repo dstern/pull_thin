@@ -313,12 +313,12 @@ def main(argv=None):
                 
         
         pre_converted_filePar2=[]
-        for i in glob.iglob("*par*.pulled.converted"):
-                pre_converted_filePar2.append(i[:-17])
+        for i in glob.iglob("*par*.pulled.converted.thinned"):
+                pre_converted_filePar2.append(i[:-18])
 #		print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_converted_filePar2:
-                filePar2 = filePar2 + ".converted"
-                print "%s has been pre-converted" %(filePar2)
+#                filePar2 = filePar2 + ".converted.thinned"
+                print "%s has been converted and thinned" %(filePar2)
                 pass
         else:#if file not yet converted and thinned
                 print "Converting and thinning file"
@@ -344,12 +344,12 @@ def main(argv=None):
                                 file_to_pulled(filePar1)#if request all, just paste file to new file with .pulled suffix
                         filePar1 = filePar1 + ".pulled"
                 pre_converted_filePar1=[]
-                for i in glob.iglob("*par*.pulled.converted.thinned"):
+                for i in glob.iglob("*par*.pulled.converted"):
                         pre_converted_filePar1.append(i[:-17])
         #		print set(pre_pulled_filePar1), set(filePar1)
                 if filePar1 in pre_converted_filePar1:
-                        filePar1 = filePar1 + ".converted.thinned"
-                        print "%s has been thinned" %(filePar1)
+                        filePar1 = filePar1 + ".converted"
+                        print "%s has been pre-converted" %(filePar1)
                         pass
                 else:#if file not yet pulled
                         print "Converting and thinning parent1"
@@ -549,7 +549,7 @@ def f2_reduce_prob_slots(par2,par1,sex):
                 ind += 1
        
 def tsv2csv_bc(par2,sex):
-        par2_thinned = par2 + ".pulled.converted.thinned"
+        par2_thinned = par2 + ".converted.thinned"
         thinned_file = csv.reader(open(par2_thinned, 'rU'),delimiter = '\t')
         csv_out = csv.writer(open(par2 + ".csv", "w"), delimiter = ',')
         header = thinned_file.next()
