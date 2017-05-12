@@ -51,6 +51,7 @@ v.0.6.13 - bug fix - Crashed if no prior assigned. Now force assignment to backc
 v.0.6.14 - bug fix - Was not assigning X chromosme prior correctly for males
 v.0.7 - implement core computations (convert and thin) in numpy - 1 Nov 2016
 v.0.7.1 - fixed error when chrom has one marker, fixed assignment of sexes and Xchr when no sex and Xchr specific, fixed checking for par1 pre-runs
+v.0.7.2 - fixed sex assignment when supplying sex in phenofile or sexfile
 """
 
 import sys
@@ -142,20 +143,20 @@ def main(argv=None):
 
         print "Individuals = %s" %(indivs)
 
-        #num_inds = count_lines(filePar2) - 1
+        num_inds = count_lines(filePar2) - 1
 
-        #if config.has_option('Common','sex_all'):
-                #sex_all = config.get('Common','sex_all')
-                #if 'f' in sex_all.lower() or '0' in sex_all:
-                        #sex_all = '0'
-                        #sex = sex_all2sex(num_inds,sex_all)
-                        #print "All individuals are female"
-                #elif 'm' in sex_all.lower() or '1' in sex_all:
-                        #sex_all = '1'
-                        #sex = sex_all2sex(num_inds,sex_all)
-                        #print "All individuals are male"
-        #else:
-                #print "No global sex indicated"
+        if config.has_option('Common','sex_all'):
+                sex_all = config.get('Common','sex_all')
+                if 'f' in sex_all.lower() or '0' in sex_all:
+                        sex_all = '0'
+                        sex = sex_all2sex(num_inds,sex_all)
+                        print "All individuals are female"
+                elif 'm' in sex_all.lower() or '1' in sex_all:
+                        sex_all = '1'
+                        sex = sex_all2sex(num_inds,sex_all)
+                        print "All individuals are male"
+        else:
+                print "No global sex indicated"
 
         if config.has_option('Common','phenofile'):
                 phenofile = config.get('Common','phenofile')
@@ -185,7 +186,7 @@ def main(argv=None):
                                 file_to_pulled(phenofile + '.sorted')#if request all, just paste file to new file with .pulled suffix       
 
                 if config.has_option('Common','sex_all'):
-                        pass
+                        pass 
                 else:
                         sex = get_sex_phenofile(phenofile + ".sorted.pulled")
 
@@ -215,16 +216,13 @@ def main(argv=None):
                                 file_to_pulled(sexfile + '.sorted')#if request all, just paste file to new file with .pulled suffix       
                 if config.has_option('Common','sex_all'):
                         pass
-                sex = get_sex_phenofile(sexfile + ".sorted.pulled")
-        #elif sex_all:
-                #pass
+                else:
+                        sex = get_sex_phenofile(sexfile + ".sorted.pulled")
         else:
-                sex = []
-                get_num_inds = open(filePar2,'rU')
-                for line in get_num_inds:
-                        sex.append('0')
-                get_num_inds.close()
-                print "No file with sex supplied. I will assume all females"	
+#                sex = []
+                sex_all = '0'
+                sex = sex_all2sex(num_inds,sex_all)
+                print "No file with sex supplied. I will assume all females"                
 
 
         global difffac
@@ -295,21 +293,6 @@ def main(argv=None):
         filePar2 = filePar2 + ".pulled"
         
 
-        num_inds = count_lines(filePar2) - 1
-
-        if config.has_option('Common','sex_all'):
-                sex_all = config.get('Common','sex_all')
-                if 'f' in sex_all.lower() or '0' in sex_all:
-                        sex_all = '0'                        
-                        print "All individuals are female"
-                elif 'm' in sex_all.lower() or '1' in sex_all:
-                        sex_all = '1'
-                        print "All individuals are male"
-        else:
-                print "No global sex indicated. Assuming all females (homogametic sex)"
-                sex_all = '0'
-
-        sex = sex_all2sex(num_inds,sex_all)        
         
         pre_converted_filePar2=[]
         for i in glob.iglob("*par*.pulled.converted.thinned"):
@@ -1382,9 +1365,10 @@ def count_lines(count_file):
         filename = open(count_file,'rU')
         x = 0
         for line in filename:
-                x+=1
-        return x
+                if line.strip():
+                        x+=1
         filename.close()
+        return x
 
 if __name__ == "__main__":
         sys.exit(main())
