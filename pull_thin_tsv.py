@@ -52,6 +52,7 @@ v.0.6.14 - bug fix - Was not assigning X chromosme prior correctly for males
 v.0.7 - implement core computations (convert and thin) in numpy - 1 Nov 2016
 v.0.7.1 - fixed error when chrom has one marker, fixed assignment of sexes and Xchr when no sex and Xchr specific, fixed checking for par1 pre-runs
 v.0.7.2 - fixed sex assignment when supplying sex in phenofile or sexfile
+v.0.8 - added options to thin without considering missing data and to specify desired number of markers per chromosome, also thinning calculation is somewhat faster - 23 Oct 2018
 """
 
 import sys
@@ -63,10 +64,14 @@ import time
 import re
 import numpy as np
 from operator import delitem 
+import warnings
+import random
+
+warnings.filterwarnings("ignore",message = "All-NaN slice encountered")
 
 
 #default values
-difffac = 0.01
+#difffac = 0.01
 chroms = "all"
 xchroms = "X"
 
@@ -74,7 +79,7 @@ xchroms = "X"
 def main(argv=None):
         if argv is None:
                 argv = sys.argv
-#		print "hello"
+#       print "hello"
 
                 if len(argv) == 1:
                         config_file = "pt.cfg"
@@ -224,14 +229,39 @@ def main(argv=None):
                 sex = sex_all2sex(num_inds,sex_all)
                 print "No file with sex supplied. I will assume all females"                
 
-
+        if config.has_option('Common','difffac') and config.has_option('Common','numMarkers'):
+            print "Error, both difffac and numMarkers defined"
+            sys.exit()
+        
         global difffac
         if config.has_option('Common','difffac'):
                 difffac = config.get('Common','difffac')
                 difffac = float(difffac)
+                numMarkers = None
+                print "Data will be thinned with difffac = %s" %(difffac)
+        elif config.has_option('Common','numMarkers'):
+                difffac = None
+                numMarkers = config.get('Common','numMarkers')
+                numMarkers = int(numMarkers)
+                print "Data will be thinned to %d markers per chromosome" %(numMarkers)
         else:
                 difffac = 0.01
-        print "Data will be thinned with difffac = %s" %(difffac)
+                numMarkers = None
+                print "Data will be thinned with difffac = %s" %(difffac)
+        
+        if config.has_option('Common','ignoreNan'):
+            tempHolder = config.get('Common','ignoreNan').lower()
+            if tempHolder == "true" or tempHolder == "t":
+                ignoreNans = True
+                print "Ignoring missing data when thinning"
+            elif tempHolder == "false" or tempHolder == "f":
+                ignoreNans = False
+            else: 
+                ignoreNans = False
+                print "Unrecognized 'ignoreNan' option. Defaulting to False"
+        else:
+            ignoreNans = False
+                
 
         if config.has_option('Common','xchroms'):
                 xchroms = config.get('Common','xchroms')
@@ -261,19 +291,19 @@ def main(argv=None):
         if config.has_option('Common','autosome_prior'):
                 auto_prior = config.get('Common','autosome_prior')
                 auto_prior = float(auto_prior)
-                if config.has_option('Common','X_prior'):	
+                if config.has_option('Common','X_prior'):   
                         X_prior = config.get('Common','X_prior')
                         X_prior = float(X_prior)
                 else:
                         print "No X prior requested. X prior set to autosomal prior."
-                        X_prior = auto_prior		
+                        X_prior = auto_prior        
         else:
                 print "No autosomal or X prior set. Both priors set to 0.5"
                 auto_prior = 0.5
                 X_prior = 0.5
 
         print "Autosomal prior to replace NAs = %s" %(auto_prior)
-        print "X chromosome prior to replace NAs = %s" %(X_prior)	
+        print "X chromosome prior to replace NAs = %s" %(X_prior)   
 
 
         ##Pull requested individuals from Par2
@@ -281,7 +311,7 @@ def main(argv=None):
         pre_pulled_filePar2=[]
         for i in glob.iglob("*par*pulled"):
                 pre_pulled_filePar2.append(i[:-7])
-#		print set(pre_pulled_filePar2), set(filePar2)
+#       print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_pulled_filePar2:
                 print "%s has been pre-pulled" %(filePar2)
                 pass
@@ -292,18 +322,18 @@ def main(argv=None):
                         file_to_pulled(filePar2)#if request all, just paste file to new file with .pulled suffix
         filePar2 = filePar2 + ".pulled"
         
-
+        
         
         pre_converted_filePar2=[]
         for i in glob.iglob("*par*.pulled.converted.thinned"):
                 pre_converted_filePar2.append(i[:-18])
-#		print set(pre_pulled_filePar2), set(filePar2)
+#       print set(pre_pulled_filePar2), set(filePar2)
         if filePar2 in pre_converted_filePar2:
                 print "%s has been pre-converted and thinned" %(filePar2)
                 pass
         else:#if file not yet converted and thinned
                 print "Converting and thinning file"
-                convert_and_thin(filePar2 ,chroms,sex,difffac,xchroms)
+                convert_and_thin(filePar2 ,chroms,sex,difffac,numMarkers,xchroms,ignoreNans)
                 #NA2prior(filePar2,chroms,sex)
         filePar2 = filePar2 + ".converted.thinned"
 
@@ -314,7 +344,7 @@ def main(argv=None):
                 pre_pulled_filePar1=[]
                 for i in glob.iglob("*par*pulled"):
                         pre_pulled_filePar1.append(i[:-7])
-        #		print set(pre_pulled_filePar2), set(filePar2)
+        #       print set(pre_pulled_filePar2), set(filePar2)
                 if filePar1 in pre_pulled_filePar1:
                         print "%s has been pre-pulled" %(filePar1)
                         pass
@@ -328,7 +358,7 @@ def main(argv=None):
                 pre_converted_filePar1=[]
                 for i in glob.iglob("*par*.pulled.converted.thinned"):
                         pre_converted_filePar1.append(i[:-18])
-        #		print set(pre_pulled_filePar1), set(filePar1)
+        #       print set(pre_pulled_filePar1), set(filePar1)
                 if filePar1 in pre_converted_filePar1:
                         print "%s has been pre-converted and thinned" %(filePar1)
                         pass
@@ -352,7 +382,7 @@ def main(argv=None):
                         #if auto_prior or X_prior:
                                 #col_del = thin(filePar2)#thin file with difffac, return col_del for potential use to thin Par1
                         #else:
-                                #col_del = thin_NA(filePar2)#thin file with difffac, return col_del for potential use to thin Par1			
+                                #col_del = thin_NA(filePar2)#thin file with difffac, return col_del for potential use to thin Par1          
                 #else:
                         #print "No difffac provided. Data not thinned."
         ###Then use index of thinned markers to thin Par1
@@ -438,7 +468,7 @@ def sort_file(infile,delim):
         header = original_file.next()
         data_dict = dict([(line[0],line[1:]) for line in original_file])
         #sort by individual name
-
+        
         sorted_dict_keys=natsorted(data_dict.keys())
         #write file
         outfile_name = infile + ".sorted"
@@ -461,10 +491,10 @@ def f2_reduce_prob_slots(par2,par1,sex):
         '''
         thinned_file_par2 = csv.reader(open(par2, 'rU'),delimiter = '\t')
         thinned_file_par1 = csv.reader(open(par1, 'rU'),delimiter = '\t')
-
+        
         converted_file_par2 = csv.writer(open(par2 + ".f2_rqtl", "w"), delimiter = '\t')
         converted_file_par1 = csv.writer(open(par1 + ".f2_rqtl", "w"), delimiter = '\t')
-
+        
         header = thinned_file_par2.next()
         skip = thinned_file_par1.next()
         converted_file_par2.writerow(header)
@@ -476,7 +506,7 @@ def f2_reduce_prob_slots(par2,par1,sex):
                 if sex[ind] == '1':#if male, calc prob_par1 = 1 - prob_par2
                         #converted_file_par2.writerow(row)
                         #converted_file_par1.writerow(par1_line)
-
+                        
                         #set up list to accept data
                         column = 0
                         converted_row_data_par2 = []
@@ -493,18 +523,15 @@ def f2_reduce_prob_slots(par2,par1,sex):
                                 #converted_row_data_par2.append(par2_datum)
                                 #converted_row_data_par1.append(par1_datum)
                                 column += 1
-
+                        
                         converted_file_par2.writerow(converted_row_data_par2)
                         converted_file_par1.writerow(converted_row_data_par1)
-
-                       
-
                 else:#if female, or missing (assumed female), more complicated
                         '''
-			FOR FEMALES, CONVERT PAR2 PROB SLOTS TO PAR12 PROB
-			THAT IS, PUT PROBPAR1 + PROBPAR2 IN NEWPROBPAR1 (homozygous)
+            FOR FEMALES, CONVERT PAR2 PROB SLOTS TO PAR12 PROB
+            THAT IS, PUT PROBPAR1 + PROBPAR2 IN NEWPROBPAR1 (homozygous)
                         THEN, PUT PROBPAR12 (1-NEWPROBPAR1) IN PROBPAR2 (heterozygous)
-			'''
+            '''
                         #set up list to accept data
                         column = 0
                         converted_row_data_par2 = []
@@ -522,14 +549,14 @@ def f2_reduce_prob_slots(par2,par1,sex):
                                         prob_par12 = 1 - prob_par1
                                         converted_row_data_par2.append(prob_par12)#het prob goes in par2 slot
                                         converted_row_data_par1.append(prob_par1)#homo prob goes in par1 slot
-
+                                
                                 column += 1
-
+                        
                         converted_file_par2.writerow(converted_row_data_par2)
                         converted_file_par1.writerow(converted_row_data_par1)
-
+                
                 ind += 1
-       
+
 def tsv2csv_bc(par2,sex):
         par2_thinned = par2
         thinned_file = csv.reader(open(par2_thinned, 'rU'),delimiter = '\t')
@@ -540,7 +567,7 @@ def tsv2csv_bc(par2,sex):
         csv_out.writerow(header)
         csv_out.writerow(chroms)
         csv_out.writerow("")
-
+        
         x = 0#track # individuals
         for row in thinned_file:
                 ind = row[0]
@@ -566,17 +593,17 @@ def tsv2csv_bc(par2,sex):
                                                 converted_markers.append("BB")#BB
                                         else:
                                                 converted_markers.append("BA")#AB
-
+                                
                                 elif chroms[y] == "X":
                                         if marker == str(X_prior):
                                                 converted_markers.append("-")
                                         elif float(marker) > 0.5:
                                                 converted_markers.append("BB")#BB
                                         else:
-                                                converted_markers.append("AA")#AA			
+                                                converted_markers.append("AA")#AA           
                                 y+=1
                 x+=1
-
+                
                 csv_out.writerow(converted_markers)
 
         
@@ -594,7 +621,7 @@ def tsv2csv_f2(par2,par1,sex):
         csv_out.writerow(header)
         csv_out.writerow(chroms_row)
         csv_out.writerow("")
-
+        
         x = 0#track # individuals
         for row_p2 in thinned_file_par2:
                 row_p1 = thinned_file_par1.next()
@@ -605,7 +632,7 @@ def tsv2csv_f2(par2,par1,sex):
                 converted_markers = []
                 converted_markers.append(ind)
                 if ind_sex == '0':#if female, autosome genotypes = AA, AB, BB, X genotypes = AA (homozygote), AB
-
+                        
                         for z in xrange(len(markers_p2)):
                                 genos = [float(markers_p1[z]), 1- float(markers_p2[z]) - float(markers_p1[z]), float(markers_p2[z])]#genotype probs for AA, AB, BB
                                 geno = genos.index(max(genos))
@@ -627,8 +654,6 @@ def tsv2csv_f2(par2,par1,sex):
                                                 converted_markers.append("AB")
                                         elif geno == 2:
                                                 converted_markers.append("BB")
-
-
                 else: #male
                         for z in xrange(len(markers_p2)):
                                 genos = [float(markers_p1[z]), 1- float(markers_p2[z]) - float(markers_p1[z]), float(markers_p2[z])]#genotype probs for AA, AB, BB
@@ -642,7 +667,6 @@ def tsv2csv_f2(par2,par1,sex):
                                                 converted_markers.append("AB")#AB
                                         elif geno == 2:
                                                 converted_markers.append("BB")#BB
-
                                 elif chroms[z] == "X":
                                         #if genos == [auto_prior,auto_prior * 2,auto_prior]:
                                         #        converted_markers.append("-")
@@ -654,9 +678,7 @@ def tsv2csv_f2(par2,par1,sex):
                                         #        converted_markers.append("-")#if male scored with het as highest prob, record as missing data
                                         elif genos[0] < genos[2]:
                                                 converted_markers.append("BB")#hemizygous B
-
                 x+=1
-
                 csv_out.writerow(converted_markers)
         #thinned_file_par2.close()
         #thinned_file_par1.close()
@@ -684,22 +706,6 @@ def get_sex_phenofile(phenofile):
         replace_all(sex,'m','1')
         return sex
 
-def get_sex_sexfile(sexfile):
-        sex = []
-        #get sex from sexfile
-        open_file = csv.reader(open(sexfile,'rU'),delimiter='\t')
-        header = open_file.next()
-        sex_index = header.index('sex')
-        for row in open_file:
-                sex.append(str(row[sex_index]))
-        replace_all(sex,0,'0')
-        replace_all(sex,1,'1')
-        replace_all(sex,'F','0')
-        replace_all(sex,'f','0')
-        replace_all(sex,'M','1')
-        replace_all(sex,'m','1')
-        return sex
-
 def with_index(seq):
         for i in xrange(len(seq)):
                 yield i, seq[i]
@@ -708,22 +714,6 @@ def replace_all(seq, obj, replacement):
         for i, elem in with_index(seq):
                 if elem == obj:
                         seq[i] = str(replacement)
-
-def replace_all_in_array(array,obj,replacement):
-        temp_array = []
-        row_num = 0
-        for row in array:
-                row_num +=1
-                if row_num==1:#ignore markers
-                        temp_array.append(row)#just paste in temp_array
-                else:
-                        name = row[0]
-                        data = row[1:]
-                        replace_all(data,obj,replacement)
-                        data.insert(0,name)
-                        temp_array.append(data)
-                        
-        return temp_array
 
 def pull_idds(sample_file,indivs):#filePar2,indivs):
         print "pulling requested individuals"
@@ -741,18 +731,14 @@ def pull_idds(sample_file,indivs):#filePar2,indivs):
         open_file.close()
         out_file.close()
 
-def containsAny(str, set):
-    """Check whether 'str' contains ANY of the chars in 'set'"""
-    return 1 in [c in str for c in set]
-
 def file_to_pulled(sample_file):
         open_file = csv.reader(open(sample_file,'rU'),delimiter='\t')
         print_file = csv.writer(open(sample_file + ".pulled",'w'),delimiter='\t')
         for line in open_file:
                 print_file.writerow(line)
  
-def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
-        #for testinG
+def convert_and_thin(sample_file,chroms,sex,difffac,numMarkers,xchroms,ignoreNans):
+        #for testing
         #import numpy as np
         #sample_file="testpar1.tsv.sorted.pulled"
         #difffac = 0.1
@@ -780,7 +766,7 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
         print "reading individual names"
         inds = np.genfromtxt(sample_file,comments='#', delimiter="\t", 
                              usecols=0, usemask=False, loose=True, 
-                             invalid_raise=True, max_rows=None, dtype='S')        
+                             invalid_raise=True, max_rows=None, dtype='S')
         
         #read second column to end, skipping first row to get data
         
@@ -791,21 +777,17 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
         #get chromosomes from all markers
         ch = []
         m = np.char.rsplit(markers, sep=":", maxsplit=None)
-        for i in m:
-                ch.append(i[0]) #ch is list of chromosomes for each marker
-        ch = np.array(ch)
+        ch = np.array([x[0] for x in m]) #ch is list of chromosomes for each marker
 
         #IF CHROMS == ALL, LIST ALL CHROMS IN chroms
         if "all" in chroms:
                 chroms = np.unique(ch)
 
-                
-        
         #PULL OUT ARRAY FOR EACH CHROMOSOME
         for chr in chroms:
                 print "Thinning chromosome %s" %(chr)
-                chr_columns = np.char.find(markers, chr + ":") == 0
-        
+                #chr_columns = np.char.find(markers, chr + ":") == 0
+                chr_columns = ch == chr
                 #SUBSET TOTAL ARRAY BASED ON INDICES IN CHR_COLUMNS
         
                 marker_subset = markers[chr_columns]
@@ -821,43 +803,70 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
                                    invalid_raise=True, max_rows=None)
 
                 try:
-                        markersthinned = np.empty((1,1),dtype = object)
-                        markersthinned[0,0] = marker_subset[0]
+                        #markersthinned = np.empty((1,1),dtype = object)
+                        #markersthinned[0,0] = marker_subset[0]
 
                         #if chrom contains only 1 marker, then place pp in ppthinned and skip thinning
                         np.shape(pp)[1]      #test if array has > 1 column, if this fails, will skip to except IndexError
         
                         #for each chrom, place first column
-                        ppthinned = np.empty((nrows, 1))
-                        ppthinned[:,0] = pp[:,0]
+                        #ppthinned = np.empty((nrows, 1))
+                        #ppthinned[:,0] = pp[:,0]
                 
                         subset_ncols = np.shape(pp)[1]
                         #select appropriate intermediate columns
-                        for col in range(0,subset_ncols-2): 
-                                #print col
-                                if np.allclose(pp[:,col],pp[:,col+1],atol=difffac,equal_nan=True) and np.allclose(pp[:,col],pp[:,col+2],atol=difffac*2,equal_nan=True):#if first col similar to both next and next + 1 col
-                                        pass #skip
-                                else:#if next and next next are different, keep next
-                                        push = np.empty((nrows,1))#define array
-                                        push[:,0] = pp[:,col+1]#fill array with 1 column                                
-                                        ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
-                                        markerpush = np.empty((1,1),dtype=object)
-                                        markerpush[0] = marker_subset[col+1]
-                                        markersthinned = np.concatenate((markersthinned,markerpush),axis=0)
-                        #ADD LAST COLUMN
-                        push = np.empty((nrows,1))#define array
-                        
-                        if subset_ncols == 2: #only 2 columns, grab second
-                                push[:,0] = pp[:,1]
-                                markerpush = np.empty((1,1),dtype=object)
-                                markerpush[0] = marker_subset[1]
+                        if not ignoreNans:
+                            pp[np.isnan(pp)] = 2
+                            difffac1 = np.max(np.abs(pp[:,0:-2] - pp[:,1:-1]),axis = 0)
+                            difffac2 = np.max(np.abs(pp[:,0:-2] - pp[:,2:]),axis = 0)
+                            pp[pp == 2] = np.nan
+                            difffac1[difffac1 > 1] = 1 # Force the difffac to be 1 if comparing to an Nan
+                            difffac2[difffac2 > 1] = 2 # Force the difffac to be 2 if comparing to an Nan (so after division, it's 1)
                         else:
-                                push[:,0] = pp[:,col+2]#fill array with last column
-                                markerpush = np.empty((1,1),dtype=object)
-                                markerpush[0] = marker_subset[col+2]                                
-                
-                        ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
-                        markersthinned = np.concatenate((markersthinned,markerpush),axis=0) 
+                            difffac1 = np.nanmax(np.abs(pp[:,0:-2] - pp[:,1:-1]),axis = 0)
+                            difffac2 = np.nanmax(np.abs(pp[:,0:-2] - pp[:,2:]),axis = 0)
+                            
+                            difffac1[np.isnan(difffac1)] = 0
+                            difffac2[np.isnan(difffac2)] = 0
+                        
+                        if difffac != None:
+                            difffac_list = np.maximum(difffac1,difffac2/2)
+                            thinningLogical = difffac_list >= difffac
+                        else: 
+                            difffac_list = np.maximum(difffac1,difffac2/2)
+                            sorted_list = np.sort(difffac_list)[::-1]
+                            temp_difffac = sorted_list[numMarkers-3]
+                            print "Thinning chr %s with difffac %f" % (chr,temp_difffac)
+                            
+                            if temp_difffac == 1:
+                                print("Warning: the number of markers selected is less than the number of sites that switch from missing to not-missing data. You should set your number of markers higher. Thinning remaining markers randomly.")
+                            
+                            if np.sum(difffac_list == temp_difffac) > 1:
+                                thinningLogical = difffac_list > temp_difffac
+                                random.seed(42)
+                                equalToDifffacIndices = numpy.where(difffac_list == temp_difffac)
+                                selectedIndices = np.random.choice(equalToDifffacIndices,size=(numMarkers - np.sum(thinningLogical) - 2),replace=False)
+                                thinningLogical[selectedIndices] = True
+                            else:
+                                thinningLogical = difffac_list >= temp_difffac
+                        
+                        thinningLogical = np.concatenate((True,thinningLogical,True),axis=None)
+                        ppthinned = pp[:,thinningLogical]
+                        markersthinned = np.array(marker_subset)[thinningLogical]
+                        #ADD LAST COLUMN
+                        #push = np.empty((nrows,1))#define array
+                        
+                        #if subset_ncols == 2: #only 2 columns, grab second
+                        #        push[:,0] = pp[:,1]
+                        #        markerpush = np.empty((1,1),dtype=object)
+                        #        markerpush[0] = marker_subset[1]
+                        #else:
+                        #        push[:,0] = pp[:,col+2]#fill array with last column
+                        #        markerpush = np.empty((1,1),dtype=object)
+                        #        markerpush[0] = marker_subset[col+2]                                
+                        #
+                        #ppthinned = np.concatenate((ppthinned, push),axis=1)#concatenate column to ppthinned
+                        #markersthinned = np.concatenate((markersthinned,markerpush),axis=0) 
                         
                 except IndexError:
                         #array has one column, so skipped thinning and placed pp in ppthinned with correct shape. Proceed to conversion
@@ -892,7 +901,8 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
         
         #CONCATENATE MARKERS AND PP
         
-        markedppout = np.concatenate((np.transpose(markers_out),ppout),axis=0)
+        print "Joining marker names to genotype matrix"
+        markedppout = np.concatenate((markers_out.reshape((1,markers_out.shape[0])),ppout),axis=0)
         inds = np.reshape(inds, (np.size(inds),1))
         outarray = np.concatenate((inds,markedppout),axis=1)
         #print outarray
@@ -900,7 +910,7 @@ def convert_and_thin(sample_file,chroms,sex,difffac,xchroms):
         
         np.savetxt(sample_file +".converted.thinned", outarray, delimiter='\t', newline='\n',fmt = '%s')
 
-        
+
 def convert_and_thin_Par1(filePar2,filePar1,sex,chroms,xchroms):
         #grab first row of filePar2 and filePar2
         markersP2 = np.genfromtxt(filePar2, max_rows=1, delimiter="\t",dtype='S')
@@ -908,12 +918,12 @@ def convert_and_thin_Par1(filePar2,filePar1,sex,chroms,xchroms):
         
         #compare and keep indices of filePar1 that match filePar2
         #grab_idx = np.searchsorted(markersP1,markersP2)
-
+        
         grab_idx = []
         for i in range(np.size(markersP1)):
                 if np.any(markersP1[i]==markersP2):
                         grab_idx.append(i)
-                        
+        
         #read in sub_array based on grab_idx
         ppthinned = np.genfromtxt(filePar1, delimiter="\t", missing_values="NA", 
                            filling_values=np.nan, usecols=grab_idx, usemask=False, loose=True, 
@@ -943,424 +953,16 @@ def convert_and_thin_Par1(filePar2,filePar1,sex,chroms,xchroms):
         xch_idx = xchroms == ch
         #make array
         xchromcolumns = np.tile(xch_idx, np.shape(malerows)[0]).reshape(-1,np.shape(malerows)[1])
-
-
+        
         ppthinned[(ppthinned == 'NA') & malerows & xchromcolumns] = X_prior * 2
         ppthinned[(ppthinned == 'NA') & femalerows & xchromcolumns] = X_prior
-
+        
         #define all other NA as autosomal
         ppthinned[(ppthinned == 'NA')] = auto_prior
         
         #print out new thinned Par2
         np.savetxt(filePar1 +".converted.thinned", ppthinned, delimiter='\t', newline='\n',fmt = '%s')
-        
-        
 
-def NA2prior(sample_file,chroms,sex):
-        #pull requested chromosomes
-        #And convert NAs to priors
-        print "Pulling requested chromosomes"
-        temp_data=[]
-        col_del=[]
-        num_loci = 0
-        num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled",'rU'),delimiter='\t')
-        ##get data into lists
-        for row in open_file:
-                temp_data.append(row)
-        if len(temp_data) > 1:#if any individuals in array
-                ##find columns for deletions
-                num_loci = len(temp_data[0])-1##note that loci start at pos 1
-                num_ids = len(temp_data)
-
-
-                ###TEST THIS SECTION
-                #select only requested chromosomes
-                chroms_lower=[x.lower() for x in chroms]
-                if "all" not in chroms_lower:
-                        selected_chrom_data = []
-                        for row in temp_data:#save individuals from column 0
-                                selected_chrom_data.append([row[0]])
-
-                        for column in temp_data[0]:#takes column names from row 0
-                                if column.split(":")[0] in chroms:#if the marker is from a requested chrom
-                                        column_num = temp_data[0].index(column)#save index of marker
-                                        #paste data from selected column into each row
-                                        row_num = 0
-                                        for row in temp_data:#for each row of data
-                                                selected_chrom_data[row_num].append(row[column_num])#append data
-                                                row_num +=1
-                                        if column_num in range(1000,10000000,1000):
-                                                print "Marker %s of %s pulled" %(column_num,num_loci)
-
-                        temp_data = selected_chrom_data
-                print "converting NAs to priors"
-
-                #Replace NAs with priors, according to cross type, chromosome & sex
-                if "bc" in cross:
-                        if auto_prior:
-                                
-                                temp_data = replace_all_in_array(temp_data,"NA",auto_prior)
-                        else:
-                                print "No autosome prior provided for your backcross. I assumed 0.5."
-                elif "f2" in cross:
-                        if X_prior and sex:
-                                #replace male autosome with autosome_prior, X with 2*X_prior
-                                #replace female autosome with autosome_prior, X with X+_prior
-                                male_X_prior = 2 * X_prior
-                                female_X_prior = X_prior
-                                column_num=0#keep column index
-                                for column in temp_data[0]:#takes column names from row 0
-                                        #if column_num >0:#ignore column of names
-                                                if column.split(":")[0] == "X":#if marker on X
-                                                        row_num = 0
-                                                        for row in temp_data:#for each row of data
-                                                                if row_num !=0:#ignore row 0, these are headers
-                                                                        if "NA" in row[column_num]:
-                                                                                if sex[row_num-1] == '1':#if male:Note, sex is array of sexes only, not header, thus reduce index by one relative to other arrays
-                                                                                        temp_data[row_num][column_num] = male_X_prior
-                                                                                else:#if female: Asume female if no sex parameters given
-                                                                                        temp_data[row_num][column_num] = female_X_prior
-        
-                                                                row_num +=1
-                                                column_num+=1
-
-                                #Replace all autosomal NA's with autosome_prior
-                                ##USE code from above for bc
-                                if auto_prior:
-                                        temp_data = replace_all_in_array(temp_data,"NA",auto_prior)
-                                else:
-                                        print "No autosome prior provided for your backcross. I assumed 0.5."
-                        else:
-                                print "You failed to provide either/both X prior and sex for your F2 cross. NAs replaced with 0.5."
-
-
-
-
-        converted_file = csv.writer(open(sample_file +".pulled.converted",'w'),delimiter='\t')
-        for line in range(num_ids):
-                converted_file.writerow(temp_data[line])
-
-
-def thin(sample_file):
-
-        print "collecting Par2 data for thinning"
-        temp_data=[]
-        col_del=[]
-        num_loci = 0
-        num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled.converted",'rU'),delimiter='\t')
-        thinned_file = csv.writer(open(sample_file +".pulled.converted.thinned",'w'),delimiter='\t')
-
-        ##get data into lists
-
-
-        #Note that marker positions are now saved to separate array
-        #post probs (and ind names) are save to temp_data. Makes easy to slice with temp_data[:][requested_column]
-        idds = []
-        markers = []
-        markers = open_file.next()
-        markers = markers[1:]#marker[0] = ''
-        individual = 0
-        for row in open_file:
-                individual +=1
-                if individual in range(10,10000,10):
-                        print "Individual %s" %individual
-                idds.append(row[0])
-                pps = row[1:]
-                pps = [float(a) for a in pps]
-                temp_data.append(pps)
-        row =[]
-        #idds = [a[0] for a in temp_data]
-        #temp_data = [a[1:] for a in temp_data]
-        #for ind in temp_data:
-        #	temp_data.append([float(a) for a in ind])
-        num_loci = len(markers)
-        num_ids = len(idds)
-        start_time = time.clock()
-        if num_ids > 1:#if any individuals in array
-                ##find columns for deletions
-                #num_loci = len(temp_data[1])##note that loci start at pos 1
-                #num_ids = len(temp_data)##note that ids start at pos 1
-                #identify redundant columns for deletion, defined by difffac
-                print "identifying redundant columns"
-                for marker in range(0,num_loci-2):
-                        if marker in range(1000,10000000,1000):
-                                print "Marker %s of %s" %(marker,num_loci)
-                        if markers[marker].split(":")[0] == markers[marker+2].split(":")[0]: ##if same chrom arm
-
-                                #get column of data for x, x+1, x+2
-                                y = [i[marker] for i in temp_data]
-                                y_1 = [i[marker+1] for i in temp_data]
-                                y_2 = [i[marker+2] for i in temp_data]
-
-                                if y == y_1 == y_2:#if 3 adjacent columns are identical
-                                        col_del.append(marker+1)
-                                else:
-                                        Y1_diff=[]
-                                        Y2_diff=[]
-
-                                        Y1_diff = [abs(s - t) for s,t in zip(y_1,y)]
-                                        Y2_diff = [abs(s - t) for s,t in zip(y_2,y_1)]	
-
-                                        if max(Y1_diff) < difffac and max(Y2_diff) < difffac:
-                                                col_del.append(marker+1)
-                stop_time = time.clock()
-                total_time = stop_time - start_time
-                print "Time = %s" %total_time
-                print "Deleting redundant columns from Par2"
-
-                col_del.reverse()#need to delete from end of each line
-                reverse_time = time.clock() - stop_time
-                #print "Reversing = %s" %reverse_time
-                #delete marked columns
-                for del_marker in col_del:		
-                        delitem(markers,del_marker)
-                del_data=[]
-                individual = 0
-                for row in temp_data:
-                        individual +=1
-                        if individual in range(10,10000,10):
-                                print "Individual %s" %individual 
-                        for del_marker in col_del:
-                                delitem(row,del_marker)
-                        del_data.append(row)
-
-                delete_time = time.clock() - reverse_time
-                print "Deletion = %s" %delete_time
-                print "Printing thinned file for Par2"
-                #write thinned data to file
-                markers.insert(0,'')
-                thinned_file.writerow(markers)
-                for line in range(num_ids):
-                        del_data[line].insert(0,idds[line])
-                        thinned_file.writerow(del_data[line])
-
-        #return col_del for potential use to delete columns in Par1		
-        return col_del
-
-def thin_NA(sample_file):
-
-        print "collecting Par2 data for thinning"
-        temp_data=[]
-        col_del=[]
-        num_loci = 0
-        num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled.converted",'rU'),delimiter='\t')
-        thinned_file = csv.writer(open(sample_file +".pulled.converted.thinned",'w'),delimiter='\t')
-
-        ##get data into lists
-
-
-        #Note that marker positions are now saved to separate array
-        #post probs (and ind names) are save to temp_data. Makes easy to slice with temp_data[:][requested_column]
-        idds = []
-        markers = []
-        markers = open_file.next()
-        markers = markers[1:]#marker[0] = ''
-        individual = 0
-        for row in open_file:
-                individual +=1
-                if individual in range(10,10000,10):
-                        print "Individual %s" %individual
-                idds.append(row[0])
-                pps = row[1:]
-                #pps = [float(a) for a in pps]
-                temp_data.append(pps)
-        row =[]
-        #idds = [a[0] for a in temp_data]
-        #temp_data = [a[1:] for a in temp_data]
-        #for ind in temp_data:
-        #	temp_data.append([float(a) for a in ind])
-        num_loci = len(markers)
-        num_ids = len(idds)
-        start_time = time.clock()
-        if num_ids > 1:#if any individuals in array
-                ##find columns for deletions
-                #num_loci = len(temp_data[1])##note that loci start at pos 1
-                #num_ids = len(temp_data)##note that ids start at pos 1
-                #identify redundant columns for deletion, defined by difffac
-                print "identifying redundant columns"
-                for marker in range(0,num_loci-2):
-                        if marker in range(1000,10000000,1000):
-                                print "Marker %s of %s" %(marker,num_loci)
-                        if markers[marker].split(":")[0] == markers[marker+2].split(":")[0]: ##if same chrom arm
-
-                                #get column of data for x, x+1, x+2
-                                y = [i[marker] for i in temp_data]
-                                y_1 = [i[marker+1] for i in temp_data]
-                                y_2 = [i[marker+2] for i in temp_data]
-
-                                if y == y_1 == y_2:#if 3 adjacent columns are identical
-                                        col_del.append(marker+1)
-                                #else:
-                                #	Y1_diff=[]
-                                #	Y2_diff=[]
-        #
-        #				Y1_diff = [s - t for s,t in zip(y_1,y)]
-        #				Y2_diff = [s - t for s,t in zip(y_2,y_1)]	
-        #						
-        #				if max(Y1_diff) < difffac and max(Y2_diff) < difffac:
-        #					col_del.append(marker+1)
-                stop_time = time.clock()
-                total_time = stop_time - start_time
-                print "Time = %s" %total_time
-                print "Deleting redundant columns from Par2"
-
-                col_del.reverse()#need to delete from end of each line
-                reverse_time = time.clock() - stop_time
-                #print "Reversing = %s" %reverse_time
-                #delete marked columns
-                for del_marker in col_del:		
-                        delitem(markers,del_marker)
-                del_data=[]
-                individual = 0
-                for row in temp_data:
-                        individual +=1
-                        if individual in range(10,10000,10):
-                                print "Individual %s" %individual 
-                        for del_marker in col_del:
-                                delitem(row,del_marker)
-                        del_data.append(row)
-
-                delete_time = time.clock() - reverse_time
-                print "Deletion = %s" %delete_time
-                print "Printing thinned file for Par2"
-                #write thinned data to file
-                markers.insert(0,'')
-                thinned_file.writerow(markers)
-                for line in range(num_ids):
-                        del_data[line].insert(0,idds[line])
-                        thinned_file.writerow(del_data[line])
-
-        #return col_del for potential use to delete columns in Par1		
-        return col_del
-
-def thin_Par1(sample_file,col_del):
-
-        temp_data=[]
-        num_loci = 0
-        num_ids = 0
-        open_file = csv.reader(open(sample_file + ".pulled.converted",'rU'),delimiter='\t')
-        thinned_file = csv.writer(open(sample_file +".pulled.converted.thinned",'w'),delimiter='\t')
-
-        print "thinning data Par1"
-        idds = []
-        markers = []
-        markers = open_file.next()
-        markers = markers[1:]#marker[0] = ''
-        individual = 0
-        for row in open_file:
-                individual +=1
-                if individual in range(10,10000,10):
-                        print "Individual %s" %individual
-                idds.append(row[0])
-                pps = row[1:]
-                pps = [float(a) for a in pps]
-                temp_data.append(pps)
-        row =[]
-        #idds = [a[0] for a in temp_data]
-        #temp_data = [a[1:] for a in temp_data]
-        #for ind in temp_data:
-        #	temp_data.append([float(a) for a in ind])
-        num_loci = len(markers)
-        num_ids = len(idds)	
-
-
-        #Delete columns based on redundant columns identified in Par2 file and passed to this function
-        print "Deleting redundant columns from Par1"
-        for del_marker in col_del:		
-                delitem(markers,del_marker)
-        del_data=[]
-        individual = 0
-        for row in temp_data:
-                individual +=1
-                if individual in range(10,10000,10):
-                        print "Individual %s" %individual 
-                for del_marker in col_del:
-                        delitem(row,del_marker)
-                del_data.append(row)
-
-        print "Printing thinned file for Par1"
-        markers.insert(0,'')
-        thinned_file.writerow(markers)
-        for line in range(num_ids):
-                del_data[line].insert(0,idds[line])
-                thinned_file.writerow(del_data[line])
-
-def combine_filePar2(filePar2):
-#Find all chromosome names, put in list
-        chrom_positions=[]
-        for file_name in filePar2:
-                open_file = csv.reader(open(file_name + ".pulled.thinned",'rU'),delimiter='\t')
-                row = open_file.next()
-                chrom_positions.append(row)
-        chrom_positions = [item for sublist in chrom_positions for item in sublist]#make single list sublists
-        chrom_positions = list(set(chrom_positions))#reduce to unique set of chrom_positions
-
-#Make list for each chromosome, then append all chromosome positions for all filePar2 in single list
-#Check on chromosome names, then make set
-        chroms = []
-        for item in chrom_positions:
-                if item:
-                        chroms.append(item.split(":")[0])
-
-                #sort(set(list)) to get non-redundant set of chrom positions
-        chroms = sorted(set(chroms))
-        chroms = [i + ":" for i in chroms]#replace colon, so that only real chromosomes (and not values including just numbers -like chr 4 - are called later)
-        all_positions = ['']#header to paste in first row of csv file
-        header=[]
-        for chrom in chroms:
-                chrom_bp=[]
-                for item in chrom_positions:
-                        if chrom in item:
-                                chrom_bp.append(int(item.split(":")[1]))
-                chrom_bp=sorted(set(chrom_bp))
-
-                for position in chrom_bp:
-                        all_positions.append(chrom + ":" + str(position))
-
-        num_rows=0
-        last_row = 0
-        final_array=[]
-        final_array.append(all_positions)
-
-        for file_name in filePar2:
-                ind_data=[]
-                open_file = csv.reader(open(file_name + ".pulled.thinned",'rU'),delimiter='\t')
-                file_header = open_file.next()
-                for row in open_file:
-                        ind_data.append(row)
-                        final_array.append([row[0]])
-                        num_rows+=1
-                column_num=0
-                for position in all_positions:
-                        row_num=0+last_row
-                        if position == '':
-                                pass
-                        elif position in file_header:
-                                list_position = file_header.index(position)
-                                for row in ind_data:
-                                        row_num+=1
-                                        final_array[row_num].append(row[list_position])
-                        else:
-                                for row in ind_data:
-                                        row_num+=1
-                                        final_array[row_num].append("NA")
-                        column_num+=1
-                last_row = row_num
-        if "-par1.tsv" in filePar2[0]:
-                suffix = "-par1.tsv"
-        elif "-par2.tsv" in filePar2[0]:
-                suffix = "-par2.tsv"
-        elif "-par1par2.tsv" in filePar2[0]:
-                suffix = "-par1par2.tsv"
-        print_file = csv.writer(open("combined-ancestry-probs"+suffix,'w'),delimiter='\t')
-
-        for line in final_array:
-                print_file.writerow(line)
-
- 
 def count_lines(count_file):
         filename = open(count_file,'rU')
         x = 0
