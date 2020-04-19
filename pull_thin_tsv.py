@@ -53,6 +53,7 @@ v.0.7 - implement core computations (convert and thin) in numpy - 1 Nov 2016
 v.0.7.1 - fixed error when chrom has one marker, fixed assignment of sexes and Xchr when no sex and Xchr specific, fixed checking for par1 pre-runs
 v.0.7.2 - fixed sex assignment when supplying sex in phenofile or sexfile
 v.0.8 - added options to thin without considering missing data and to specify desired number of markers per chromosome, also thinning calculation is somewhat faster - 23 Oct 2018
+v.0.8.1 - fixed bug that did not correctly count # samples after selecting subset of individuals
 """
 
 import sys
@@ -148,21 +149,6 @@ def main(argv=None):
 
         print "Individuals = %s" %(indivs)
 
-        num_inds = count_lines(filePar2) - 1
-
-        if config.has_option('Common','sex_all'):
-                sex_all = config.get('Common','sex_all')
-                if 'f' in sex_all.lower() or '0' in sex_all:
-                        sex_all = '0'
-                        sex = sex_all2sex(num_inds,sex_all)
-                        print "All individuals are female"
-                elif 'm' in sex_all.lower() or '1' in sex_all:
-                        sex_all = '1'
-                        sex = sex_all2sex(num_inds,sex_all)
-                        print "All individuals are male"
-        else:
-                print "No global sex indicated"
-
         if config.has_option('Common','phenofile'):
                 phenofile = config.get('Common','phenofile')
                 #if supplied, get sex of each individual (0 = F, 1 = M)
@@ -223,15 +209,18 @@ def main(argv=None):
                         pass
                 else:
                         sex = get_sex_phenofile(sexfile + ".sorted.pulled")
+        elif config.has_option('Common','sex_all'):
+                pass
         else:
-#                sex = []
+#               sex = []
                 sex_all = '0'
                 sex = sex_all2sex(num_inds,sex_all)
                 print "No file with sex supplied. I will assume all females"                
 
+
         if config.has_option('Common','difffac') and config.has_option('Common','numMarkers'):
-            print "Error, both difffac and numMarkers defined"
-            sys.exit()
+                print "Error, both difffac and numMarkers defined"
+                sys.exit()
         
         global difffac
         if config.has_option('Common','difffac'):
@@ -322,6 +311,23 @@ def main(argv=None):
                         file_to_pulled(filePar2)#if request all, just paste file to new file with .pulled suffix
         filePar2 = filePar2 + ".pulled"
         
+
+        num_inds = count_lines(filePar2) - 1
+
+        if config.has_option('Common','sex_all'):
+                sex_all = config.get('Common','sex_all')
+                if 'f' in sex_all.lower() or '0' in sex_all:
+                        sex_all = '0'
+                        sex = sex_all2sex(num_inds,sex_all)
+                        print "All individuals are female"
+                elif 'm' in sex_all.lower() or '1' in sex_all:
+                        sex_all = '1'
+                        sex = sex_all2sex(num_inds,sex_all)
+                        print "All individuals are male"
+        else:
+                print "No global sex indicated"
+
+
         
         
         pre_converted_filePar2=[]
@@ -415,7 +421,7 @@ def main(argv=None):
         for i in glob.iglob(filePar2 + ".csv"):
                 sortedcsv.append(i[:-4])
         if filePar2 in sortedcsv:
-                print "csv created alrady"
+                print "csv created already"
         else:
                 if cross == 'bc':
                         print "Creating csv file for bc."
